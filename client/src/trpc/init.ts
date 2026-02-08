@@ -1,0 +1,88 @@
+import { db } from '@/db';
+import { agents, meetings } from '@/db/schema';
+import { auth } from '@/lib/auth';
+import { polarClient } from '@/lib/polar';
+import { MAX_FREE_AGENTS, MAX_FREE_MEETINGS } from '@/modules/premium/constants';
+import {  initTRPC, TRPCError } from '@trpc/server';
+import { count, eq } from 'drizzle-orm';
+import { headers } from 'next/headers';
+import { cache } from 'react';
+
+export const createTRPCContext = cache(async () => {
+    /**
+     * @see https://trpc.io/docs/server/content
+     */
+   const session = await auth.api.getSession({ headers: await headers() });
+
+  return {
+    auth: {
+      session,
+      user: session?.user ?? null,
+    },
+  };
+});
+
+
+const t = initTRPC.create({
+  /**
+     * @see https://trpc.io/docs/server/content
+     */ 
+});
+
+export const createTRPCRouter = t.router;
+export const createCallerFactory = t.createCallerFactory;
+export const baseProcedure = t.procedure;
+export const protectedProcedure = baseProcedure.use(async ({ ctx, next}) => {
+  const session = await auth.api.getSession({
+    headers: await headers(),
+  });
+  if (!session) {
+    throw new TRPCError({ code: "UNAUTHORIZED", message: "UNAUTHORIZED"});
+  }
+   
+  return next({ctx: {...ctx, auth: session}});
+ 
+}) 
+
+
+{/*export const premiumProcedure = (entity: "meetings" | "agents") => 
+  protectedProcedure.use(async ({ ctx, next}) => {
+    const customer = await polarClient.customers.getStateExternal({
+      externalId: ctx.auth.user.id,
+    });
+
+    const [userMeetings] = await db.select({
+            count: count(meetings.id),
+        }).from(meetings).where(eq(meetings.userId, ctx.auth.user.id));
+    
+    
+        const [userAgents] = await db.select({
+            count: count(agents.id),
+        }).from(agents).where(eq(agents.userId, ctx.auth.user.id));
+
+
+        const isPremium = customer.activeSubscriptions.length > 0;
+        const isFreeAgentLimitReached = userAgents.count >= MAX_FREE_AGENTS;
+        const isFreeMeetingLimitReached = userMeetings.count >= MAX_FREE_MEETINGS;
+
+        const shouldBlockMeeting = entity === "meetings" && isFreeMeetingLimitReached && !isPremium;
+        const shouldBlockAgent = entity === "agents" && isFreeAgentLimitReached && !isPremium;
+
+        if (shouldBlockMeeting) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "You have reached the limit of available meetings. Upgrade your plan to continue using this feature."
+          })
+        }
+
+         if (shouldBlockAgent) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "You have reached the limit of available agents. Upgrade your plan to continue using this feature."
+          })
+        }
+
+        return next({ctx: {...ctx, customer}})
+  })*/}
+
+
