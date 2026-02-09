@@ -267,11 +267,11 @@ export const SignInView = () => {
 
       <div className="text-foreground/60 text-center text-xs text-balance font-light">
         By clicking continue, you agree to our{" "}
-        <a href="#" className="text-primary hover:opacity-80 underline underline-offset-4 transition-opacity">
+        <a href="/terms" className="text-primary hover:opacity-80 underline underline-offset-4 transition-opacity">
           Terms of Service
         </a>{" "}
         and{" "}
-        <a href="#" className="text-primary hover:opacity-80 underline underline-offset-4 transition-opacity">
+        <a href="/policy" className="text-primary hover:opacity-80 underline underline-offset-4 transition-opacity">
           Privacy Policy
         </a>
       </div>

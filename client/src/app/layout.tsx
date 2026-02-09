@@ -13,6 +13,10 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "HRAI",
   description: "Train custom AI agents on your hiring standards. They screen, interview, verify, and recommend—autonomously. No black boxes. No bias. Just structured intelligence at scale.",
+  icons: {
+    icon: "/logo.svg",
+    
+  },
 };
 
 export default function RootLayout({
