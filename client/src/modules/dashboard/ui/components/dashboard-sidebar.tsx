@@ -11,7 +11,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { BotIcon, FileText, Home, LayoutDashboard, Settings, StarIcon, User, VideoIcon } from "lucide-react";
+import { BotIcon, File, FileText, Home, LayoutDashboard, Settings, StarIcon, User, VideoIcon } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { Separator } from "@/components/ui/separator";
@@ -20,6 +20,60 @@ import { usePathname } from "next/navigation";
 import DashboardUserButton from "./dashboard-user-button";
 import { DashboardTrial } from "./dashboard-trial";
 
+// HRAI Logo Component - Brutalist Geometric Design
+const HRAILogo = ({ size = 40 }: { size?: number }) => {
+  return (
+    <div className="flex items-center gap-3">
+      <svg 
+        width={size} 
+        height={size} 
+        viewBox="0 0 40 40" 
+        fill="none" 
+        xmlns="http://www.w3.org/2000/svg"
+        className="flex-shrink-0"
+      >
+        {/* Outer frame - represents structure */}
+        <rect 
+          x="2" 
+          y="2" 
+          width="36" 
+          height="36" 
+          stroke="#FF6A00" 
+          strokeWidth="2"
+          fill="none"
+        />
+        
+        {/* Inner geometric pattern - represents AI intelligence */}
+        <path 
+          d="M 20 8 L 32 14 L 32 26 L 20 32 L 8 26 L 8 14 Z" 
+          fill="#FF6A00"
+        />
+        
+        {/* Central node - represents decision point */}
+        <circle 
+          cx="20" 
+          cy="20" 
+          r="4" 
+          fill="white"
+        />
+        
+        {/* Connection lines - represents autonomous workflow */}
+        <line x1="20" y1="8" x2="20" y2="16" stroke="white" strokeWidth="1.5" />
+        <line x1="20" y1="24" x2="20" y2="32" stroke="white" strokeWidth="1.5" />
+        <line x1="8" y1="14" x2="16" y2="18" stroke="white" strokeWidth="1.5" />
+        <line x1="24" y1="22" x2="32" y2="26" stroke="white" strokeWidth="1.5" />
+      </svg>
+      
+      <div className="flex flex-col leading-none">
+        <span className="text-xl font-semibold tracking-tight text-primary">HRAI</span>
+        <span className="text-[10px] uppercase tracking-widest font-light opacity-60 mt-0.5">
+          Autonomous HR
+        </span>
+      </div>
+    </div>
+  );
+};
+
 const firstSection = [
   {
     icon: Home,
@@ -27,13 +81,10 @@ const firstSection = [
     href: "/",
   },
   {
-   
-      icon: LayoutDashboard,
-      label: "CV-Analysis",
-      href: "/user-contract",
-    
+    icon: File,
+    label: "CV-Analysis",
+    href: "/user-contract",
   },
-  
   {
     icon: VideoIcon,
     label: "Meetings",
@@ -49,8 +100,6 @@ const firstSection = [
     label: "Attendees",
     href: "/attendees",
   },
-  
-  
 ];
 
 const secondSection = [
@@ -62,34 +111,37 @@ const secondSection = [
 ];
 
 export const DashboardSidebar = () => {
-    const pathname = usePathname();
+  const pathname = usePathname();
+  
   return (
-    <Sidebar className="bg-radial from-blue-800 to-blue-950 text-sidebar-accent-foreground">
-      <SidebarHeader className= "bg-radial from-blue-800 to-blue-950 text-sidebar-accent-foreground ">
-        <Link href="/" className="flex items-center gap-2 px-2 pt-2">
-         
+    <Sidebar className="bg-white border-r-2 border-primary/10">
+      <SidebarHeader className="bg-white border-b border-primary/10">
+        <Link href="/" className="flex items-center px-4 py-6">
+          <HRAILogo size={40} />
         </Link>
       </SidebarHeader>
-      <div className="bg-radial from-blue-800 to-blue-950 px-4 py-2">
-        <Separator className="opacity-1000 text-[#000]" />
+      
+      <div className="px-4 py-2">
+        <Separator className="bg-primary/10 h-[1px]" />
       </div>
-      <SidebarContent className="bg-radial from-blue-800 to-blue-950">
+      
+      <SidebarContent className="bg-white">
         <SidebarGroup>
           <SidebarGroupContent>
-            <SidebarMenu >
+            <SidebarMenu>
               {firstSection.map((item) => (
                 <SidebarMenuItem key={item.href}>
                   <SidebarMenuButton
-                  asChild
+                    asChild
                     className={cn(
-                      "h-10 hover:bg-liner-to-r/oklch border border-transparent hover:border-[#5D6B68]/10 from-sidebar-accent from-5% via-30% via-sidebar/50 to-sidebar/50",
-                      pathname === item.href && "bg-linear-to-r/oklch border-[#5D6B68]/10"
+                      "h-12 border border-transparent hover:border-primary/20 hover:bg-amber-500 transition-all duration-200 text-foreground font-light",
+                      pathname === item.href && "bg-primary text-white border-primary hover:bg-amber-500 hover:text-white"
                     )}
                     isActive={pathname === item.href}
                   >
-                    <Link href={item.href}>
-                      <item.icon className="size-5" />
-                      <span className="text-sm font-medium tracking-tight">
+                    <Link href={item.href} className="flex items-center gap-3 px-4">
+                      <item.icon className="size-5" strokeWidth={1.5} />
+                      <span className="text-sm tracking-tight">
                         {item.label}
                       </span>
                     </Link>
@@ -100,26 +152,26 @@ export const DashboardSidebar = () => {
           </SidebarGroupContent>
         </SidebarGroup>
 
-             <div className="px-4 py-2">
-        <Separator className="opacity-1000 text-[#000]" />
-      </div>
+        <div className="px-4 py-2">
+          <Separator className="bg-primary/10 h-[1px]" />
+        </div>
 
-         <SidebarGroup >
+        <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
               {secondSection.map((item) => (
                 <SidebarMenuItem key={item.href}>
                   <SidebarMenuButton
-                  asChild
+                    asChild
                     className={cn(
-                      "h-10 hover:bg-liner-to-r/oklch border border-transparent hover:border-[#5D6B68]/10 from-sidebar-accent from-5% via-30% via-sidebar/50 to-sidebar/50",
-                      pathname === item.href && "bg-linear-to-r/oklch border-[#5D6B68]/10"
+                      "h-12 border border-transparent hover:border-primary/20 hover:bg-amber-500 transition-all duration-200 text-foreground font-light",
+                      pathname === item.href && "bg-primary text-white border-primary hover:bg-amber-500 hover:text-white"
                     )}
                     isActive={pathname === item.href}
                   >
-                    <Link href={item.href}>
-                      <item.icon className="size-5" />
-                      <span className="text-sm font-medium tracking-tight">
+                    <Link href={item.href} className="flex items-center gap-3 px-4">
+                      <item.icon className="size-5" strokeWidth={1.5} />
+                      <span className="text-sm tracking-tight">
                         {item.label}
                       </span>
                     </Link>
@@ -131,10 +183,9 @@ export const DashboardSidebar = () => {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className=" bg-radial from-blue-800 to-blue-950 text-white ">
-      {/** <DashboardTrial />*/}
-        
-         <DashboardUserButton />
+      <SidebarFooter className="bg-white border-t border-primary/10">
+        {/** <DashboardTrial /> */}
+        <DashboardUserButton />
       </SidebarFooter>
     </Sidebar>
   );

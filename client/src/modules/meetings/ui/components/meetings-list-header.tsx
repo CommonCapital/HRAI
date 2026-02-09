@@ -34,7 +34,7 @@ const onClearFilters = () => {
         <NewMeetingDialog open={isDialogOpen} onOpenChange={setIsDialogOpen}/>
         <div className="py-4 px-4 md:px-8 flex flex-col gap-y-4">
             <div className="flex items-center justify-between">
-              <h5 className="font-medium text-xl justify-between bg-blue-300 rounded-md hover:text-4xl">
+              <h5 className="font-medium text-xl justify-between bg-amber-500 rounded-md hover:text-4xl">
                 My Meetings
               </h5>
               <Button onClick={() => setIsDialogOpen(true)}>

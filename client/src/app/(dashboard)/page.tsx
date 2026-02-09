@@ -15,6 +15,7 @@ import {
   Target,
   TrendingUp
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 // Simulated interview conversation
 const interviewSteps = [
@@ -28,7 +29,7 @@ const interviewSteps = [
 // Live metrics simulation
 const MetricCounter = ({ end, label, prefix = "", suffix = "" }: any) => {
   const [count, setCount] = useState(0);
-  
+
   useEffect(() => {
     const duration = 2000;
     const increment = end / (duration / 16);
@@ -124,7 +125,7 @@ export default function HRAILanding() {
     
     return () => clearInterval(timer);
   }, [demoPlaying]);
-
+  const router = useRouter()
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
       {/* Progress indicator */}
@@ -206,6 +207,7 @@ export default function HRAILanding() {
               transition={{ delay: 0.8 }}
             >
               <motion.button
+              onClick={() => router.push(`/agents`)}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 className="px-8 h-12 bg-primary text-white text-sm tracking-widest uppercase font-light border-2 border-primary hover:bg-white hover:text-primary transition-colors"
@@ -608,6 +610,7 @@ export default function HRAILanding() {
 
             <div className="flex gap-6 justify-center">
               <motion.button
+              onClick={() => router.push(`/agents`)}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 className="px-12 h-14 bg-primary text-white text-sm tracking-widest uppercase font-light border-2 border-primary hover:bg-white hover:text-primary transition-colors"

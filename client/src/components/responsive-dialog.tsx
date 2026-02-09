@@ -24,7 +24,7 @@ export const ResponsiveDialog =({
 if (isMobile) {
     return (
         <Drawer open={open} onOpenChange={onOpenChange}>
-            <DrawerContent className="max-h-[90vh] overflow-y-auto">
+            <DrawerContent className="max-h-[90vh] overflow-y-auto bg-amber-50">
                 <DrawerHeader className="max-h-[90vh] overflow-y-auto">
                     <DrawerTitle className="max-h-[90vh] overflow-y-auto">{title}</DrawerTitle>
                     <DrawerDescription className="max-h-[90vh] overflow-y-auto">{description}</DrawerDescription>
@@ -38,7 +38,7 @@ if (isMobile) {
 }
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-h-[90vh] overflow-y-auto">
+            <DialogContent className="max-h-[90vh] overflow-y-auto bg-amber-50">
                 <DialogHeader>
                     <DialogTitle>{title}</DialogTitle>
                     <DialogDescription>{description}</DialogDescription>

@@ -119,10 +119,10 @@ export function UploadModal({
         handleClose();
       }
     }}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto bg-white">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-2xl">
-            <Sparkles className="size-6 text-blue-600" />
+            <Sparkles className="size-6 text-amber-500" />
             Analyze CV/Resume
           </DialogTitle>
           <DialogDescription>
