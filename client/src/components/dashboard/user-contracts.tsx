@@ -1,5 +1,5 @@
 'use client'
-import { ContractAnalysis } from "@/lib/contract.interface";
+
 
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { useState } from "react";
@@ -50,66 +50,83 @@ import {
 import { useTRPC } from "@/trpc/client";
 import { toast } from "sonner";
 
-export default function UserContracts() {
+export default function UserCVAnalyses() {
   
 const trpc = useTRPC()
-  const {data: contracts} = useSuspenseQuery(trpc.contracts.getUserContracts.queryOptions());
+  const {data: analyses} = useSuspenseQuery(trpc.candidates.getUserCVAnalyses.queryOptions());
 
   const [sorting, setSorting] = useState<SortingState>([]);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
 
-  const verdictColors: { [key: string]: string } = {
-    "Strong Lead": "bg-green-100 text-green-800 hover:bg-green-200",
-    Invest: "bg-green-100 text-green-800 hover:bg-green-200",
-    Track: "bg-yellow-100 text-yellow-800 hover:bg-yellow-200",
-    Monitor: "bg-yellow-100 text-yellow-800 hover:bg-yellow-200",
+  const recommendationColors: { [key: string]: string } = {
+    "Strong Hire": "bg-green-100 text-green-800 hover:bg-green-200",
+    Hire: "bg-green-100 text-green-800 hover:bg-green-200",
+    Interview: "bg-blue-100 text-blue-800 hover:bg-blue-200",
+    Maybe: "bg-yellow-100 text-yellow-800 hover:bg-yellow-200",
     Pass: "bg-red-100 text-red-800 hover:bg-red-200",
   };
 
-  const sectorColors: { [key: string]: string } = {
-    FinTech: "bg-blue-100 text-blue-800 hover:bg-blue-200",
-    HealthTech: "bg-green-100 text-green-800 hover:bg-green-200",
+  const industryColors: { [key: string]: string } = {
+    Tech: "bg-blue-100 text-blue-800 hover:bg-blue-200",
+    Technology: "bg-blue-100 text-blue-800 hover:bg-blue-200",
+    Finance: "bg-green-100 text-green-800 hover:bg-green-200",
+    Healthcare: "bg-green-100 text-green-800 hover:bg-green-200",
     SaaS: "bg-purple-100 text-purple-800 hover:bg-purple-200",
-    "E-commerce": "bg-yellow-100 text-yellow-800 hover:bg-yellow-200",
-    DeepTech: "bg-indigo-100 text-indigo-800 hover:bg-indigo-200",
+    Engineering: "bg-indigo-100 text-indigo-800 hover:bg-indigo-200",
+    "B2B Software": "bg-purple-100 text-purple-800 hover:bg-purple-200",
     Other: "bg-gray-100 text-gray-800 hover:bg-gray-200",
   };
 
   const columns: ColumnDef<any>[] = [
     {
-      accessorKey: "overview.companyName",
+      accessorKey: "candidateName",
       header: () => {
-        return <Button variant="ghost">Company</Button>;
+        return <Button variant="ghost">Candidate</Button>;
       },
       cell: ({ row }) => (
-  <div className="font-medium">
-    {row.original.overview?.companyName || row.original.id.substring(0, 8)}
-    {/* ✅ CORRECT - using id */}
-  </div>
-),
+        <div className="font-medium">
+          {/* ✅ SCHEMA: candidateName is top-level text field */}
+          {row.original.candidateName || row.original.id.substring(0, 8)}
+        </div>
+      ),
     },
     {
-      accessorKey: "overview.sector",
-      header: "Sector",
+      accessorKey: "currentRole",
+      header: "Current Role",
       cell: ({ row }) => {
-        const sector = row.original.overview?.sector || "Other";
-        const colorClass = sectorColors[sector] || sectorColors["Other"];
+        /* ✅ SCHEMA: currentRole is top-level text field */
+        const role = row.original.currentRole || "Not specified";
         return (
-          <Badge className={cn("rounded-md", colorClass)}>{sector}</Badge>
+          <div className="text-sm text-gray-700">{role}</div>
         );
       },
     },
     {
-      accessorKey: "verdict",
+      accessorKey: "industry",
+      header: "Industry",
+      cell: ({ row }) => {
+        /* ✅ SCHEMA: industry is top-level text field */
+        const industry = row.original.industry || "Other";
+        const colorClass = industryColors[industry] || industryColors["Other"];
+        return (
+          <Badge className={cn("rounded-md", colorClass)}>{industry}</Badge>
+        );
+      },
+    },
+    {
+      accessorKey: "recommendation",
       header: () => {
-        return <Button variant="ghost">Verdict</Button>;
+        return <Button variant="ghost">Recommendation</Button>;
       },
       cell: ({ row }) => {
-        const verdict = row.getValue("verdict") as string;
-        const colorClass = verdictColors[verdict] || verdictColors["Pass"];
+        /* ✅ SCHEMA: recommendation is top-level enum field
+         * Values: "Strong Hire" | "Hire" | "Interview" | "Maybe" | "Pass"
+         */
+        const recommendation = row.getValue("recommendation") as string;
+        const colorClass = recommendationColors[recommendation] || recommendationColors["Pass"];
         return (
           <Badge className={cn("rounded-md font-semibold", colorClass)}>
-            {verdict}
+            {recommendation}
           </Badge>
         );
       },
@@ -120,6 +137,7 @@ const trpc = useTRPC()
         return <Button variant="ghost">Score</Button>;
       },
       cell: ({ row }) => {
+        /* ✅ SCHEMA: overallScore is top-level integer field */
         const score = parseFloat(row.getValue("overallScore") || "0");
         const scoreColorClass =
           score > 70
@@ -136,10 +154,11 @@ const trpc = useTRPC()
       },
     },
     {
-      accessorKey: "fundAlignment.score",
-      header: "Fund Fit",
+      accessorKey: "roleAlignment.score",
+      header: "Role Fit",
       cell: ({ row }) => {
-        const score = row.original.fundAlignment?.score || 0;
+        /* ✅ SCHEMA: roleAlignment is JSONB field with score: number */
+        const score = row.original.roleAlignment?.score || 0;
         const scoreColorClass =
           score >= 7
             ? "bg-green-100 text-green-800"
@@ -155,10 +174,13 @@ const trpc = useTRPC()
       },
     },
     {
-      accessorKey: "dataQualityScore",
-      header: "Data Quality",
+      accessorKey: "completenessScore",
+      header: "CV Quality",
       cell: ({ row }) => {
-        const score = row.getValue("dataQualityScore") as number || 0;
+        /* ✅ SCHEMA: completenessScore is top-level integer field
+         * ✅ SCHEMA: missingCriticalInfo is top-level JSONB array of strings
+         */
+        const score = row.getValue("completenessScore") as number || 0;
         const missingCount = row.original.missingCriticalInfo?.length || 0;
         
         return (
@@ -177,74 +199,73 @@ const trpc = useTRPC()
     {
       id: "actions",
       cell: ({ row }) => {
-        const contract = row.original;
-const queryClient = useQueryClient();
-    const trpc = useTRPC();
+        const analysis = row.original;
+        const queryClient = useQueryClient();
+        const trpc = useTRPC();
 
-    // ✅ Add delete mutation
-    const deleteMutation = useMutation(
-      trpc.contracts.deleteContract.mutationOptions({
-        onSuccess: () => {
-          toast.success("Analysis deleted successfully");
-          queryClient.invalidateQueries({ queryKey: ["contracts"] });
-        },
-        onError: (error) => {
-          toast.error("Failed to delete analysis");
-        },
-      })
-    );
+        const deleteMutation = useMutation(
+          trpc.candidates.deleteCVAnalysis.mutationOptions({
+            onSuccess: () => {
+              toast.success("CV analysis deleted successfully");
+              queryClient.invalidateQueries({ queryKey: ["candidates"] });
+            },
+            onError: (error) => {
+              toast.error("Failed to delete CV analysis");
+            },
+          })
+        );
+        
         return (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="size-8 p-0">
-            <span className="sr-only">Open menu</span>
-            <MoreHorizontal className="size-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem>
-            <Link href={`/contract/${contract.id}`}>
-              View Analysis
-            </Link>
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <DropdownMenuItem onSelect={(e: any) => e.preventDefault()}>
-                <span className="text-destructive">Delete Analysis</span>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="size-8 p-0">
+                <span className="sr-only">Open menu</span>
+                <MoreHorizontal className="size-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem>
+                <Link href={`/candidate/${analysis.id}`}>
+                  View Analysis
+                </Link>
               </DropdownMenuItem>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>
-                  Are you absolutely sure?
-                </AlertDialogTitle>
-                <AlertDialogDescription>
-                  This action cannot be undone. This will permanently delete
-                  this pitch deck analysis and remove your data from our servers.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                {/* ✅ Add onClick handler */}
-                <AlertDialogAction
-                  onClick={() => deleteMutation.mutate({ id: contract.id })}
-                  disabled={deleteMutation.isPending}
-                >
-                  {deleteMutation.isPending ? "Deleting..." : "Continue"}
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    );
+              <DropdownMenuSeparator />
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <DropdownMenuItem onSelect={(e: any) => e.preventDefault()}>
+                    <span className="text-destructive">Delete Analysis</span>
+                  </DropdownMenuItem>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>
+                      Are you absolutely sure?
+                    </AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This action cannot be undone. This will permanently delete
+                      this CV analysis and remove your data from our servers.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => deleteMutation.mutate({ id: analysis.id })}
+                      disabled={deleteMutation.isPending}
+                    >
+                      {deleteMutation.isPending ? "Deleting..." : "Continue"}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
       },
     },
   ];
 
   const table = useReactTable({
-    data: contracts ?? [],
+    data: analyses ?? [],
     columns,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
@@ -255,42 +276,50 @@ const queryClient = useQueryClient();
     },
   });
 
-  const totalDecks = contracts?.length || 0;
+  const totalCVs = analyses?.length || 0;
   const averageScore =
-    totalDecks > 0
-      ? (contracts?.reduce(
-          (sum, contract) => sum + (contract.overallScore ?? 0),
+    totalCVs > 0
+      ? (analyses?.reduce(
+          (sum, analysis) => sum + (analysis.overallScore ?? 0),
           0
-        ) ?? 0) / totalDecks
+        ) ?? 0) / totalCVs
       : 0;
 
-  const investableDecks =
-    contracts?.filter((contract) => 
-      contract.verdict === "Invest" || contract.verdict === "Strong Lead"
+  /* ✅ SCHEMA: recommendation is enum with values "Strong Hire" | "Hire" | "Interview" | "Maybe" | "Pass" */
+  const recommendedCandidates =
+    analyses?.filter((analysis) => 
+      analysis.recommendation === "Strong Hire" || analysis.recommendation === "Hire"
     ).length ?? 0;
 
-  const highRiskDecks =
-    contracts?.filter(
-      (contract) =>
-        contract.risks?.tier1 && contract.risks.tier1.length > 0
+  /* ✅ SCHEMA: redFlags is JSONB with structure:
+   * {
+   *   critical?: { issue: string; description: string; recommendation?: string }[];
+   *   moderate?: { issue: string; description: string; mitigatingFactors?: string }[];
+   *   minor?: string[];
+   * }
+   */
+  const criticalRedFlags =
+    analyses?.filter(
+      (analysis) =>
+        analysis.redFlags?.critical && analysis.redFlags.critical.length > 0
     ).length ?? 0;
 
   return (
     <div className="container mx-auto p-6 space-y-8">
-      {/* Header - Simplified with only Analyze button */}
+      {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold">Pitch Deck Analysis</h1>
+          <h1 className="text-3xl font-bold">CV Analysis</h1>
           <p className="text-gray-600 mt-1">
-            VC-grade startup evaluation
+            Professional candidate evaluation
           </p>
         </div>
         <Button  
-      onClick={() => setIsUploadModalOpen(true)}
-      className="bg-black hover:bg-gray-900 text-white"
-      >
-      <Sparkles className="mr-2 size-4" />
-       Analyze New Deck
+          onClick={() => setIsUploadModalOpen(true)}
+          className="bg-black hover:bg-gray-900 text-white"
+        >
+          <Sparkles className="mr-2 size-4" />
+          Analyze New CV
         </Button>
       </div>
 
@@ -303,7 +332,7 @@ const queryClient = useQueryClient();
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalDecks}</div>
+            <div className="text-2xl font-bold">{totalCVs}</div>
           </CardContent>
         </Card>
         <Card>
@@ -319,21 +348,21 @@ const queryClient = useQueryClient();
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
-              Strong Leads
+              Recommended
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{investableDecks}</div>
+            <div className="text-2xl font-bold text-green-600">{recommendedCandidates}</div>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
-              High Risk (Tier 1)
+              Critical Red Flags
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">{highRiskDecks}</div>
+            <div className="text-2xl font-bold text-red-600">{criticalRedFlags}</div>
           </CardContent>
         </Card>
       </div>
@@ -382,7 +411,7 @@ const queryClient = useQueryClient();
                   colSpan={columns.length}
                   className="h-24 text-center"
                 >
-                  No pitch decks analyzed yet. Upload one to get started!
+                  No CVs analyzed yet. Upload one to get started!
                 </TableCell>
               </TableRow>
             )}
@@ -419,4 +448,3 @@ const queryClient = useQueryClient();
     </div>
   );
 }
-

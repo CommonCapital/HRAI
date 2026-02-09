@@ -109,248 +109,173 @@ export const meetings = pgTable("meetings", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
-// Update the enum to include "Invest"
-export const verdictEnum = pgEnum("verdict", ["Strong Lead", "Track", "Pass", "Invest"]);
 
-// PitchDeckAnalysis table - matches Mongoose IPitchDeckAnalysis exactly
-export const pitchDeckAnalysis = pgTable("pitch_deck_analysis", {
+
+// Update the enum for CV recommendations
+export const recommendationEnum = pgEnum("recommendation", ["Strong Hire", "Hire", "Interview", "Maybe", "Pass"]);
+
+// CVAnalysis table - stores CV/resume analysis results
+export const cvAnalysis = pgTable("cv_analysis", {
   id: text("id")
     .primaryKey()
     .$defaultFn(() => nanoid()),
   userId: text("user_id")
     .notNull()
     .references(() => user.id, { onDelete: "cascade" }),
-  deckText: text("deck_text").notNull(),
-  companyName: text("company_name"),
-  sector: text("sector"),
+  cvText: text("cv_text").notNull(),
+  candidateName: text("candidate_name"),
+  currentRole: text("current_role"),
+  industry: text("industry"),
   
-  // All nested objects as JSONB to preserve exact Mongoose structure
+  // All nested objects as JSONB to preserve structure
   inputs: jsonb("inputs").$type<{
-    deckSource?: string;
+    cvSource?: string;
     dateReceived?: Date;
-    slideCount?: number;
-    fundCriteriaUsed?: string;
-  }>(),
-  
-  missingInputs: jsonb("missing_inputs").$type<{
-    financial: string[];
-    operational: string[];
-    strategic: string[];
-  }>(),
-  
-  overview: jsonb("overview").$type<{
-    companyName?: string;
-    sector?: string;
-    product?: string;
-    customerType?: string;
-    revenueModel?: string;
-    traction?: string;
-    capitalNeed?: string;
-    stage?: string;
-    evidenceType?: "Evidence" | "Inference";
-    slideReferences?: number[];
-  }>(),
-  
-  problemDefinition: jsonb("problem_definition").$type<{
-    analysis: string;
-    isRealAndUrgent: boolean | null;
-    marketAcknowledgment: string;
-    slideReferences?: number[];
-    evidenceType?: "Evidence" | "Inference";
-  }>(),
-  
-  solution: jsonb("solution").$type<{
-    evaluation: string;
-    isBetterThanStatusQuo: boolean | null;
-    valueCreationMechanism: string;
-    slideReferences?: number[];
-    evidenceType?: "Evidence" | "Inference";
-  }>(),
-  
-  marketAnalysis: jsonb("market_analysis").$type<{
-    tam: string;
-    sam: string;
-    som: string;
-    accessibility: string;
-    tamCalculationMethod: "Bottom-up" | "Top-down" | "Not provided";
-    tamDriverTree?: string;
-    slideReferences?: number[];
-  }>(),
-  
-  validation: jsonb("validation").$type<{
-    level: "Paid usage" | "Pilots" | "LOIs" | "Surveys" | "None";
-    proofProvided: boolean;
-    validationStrength: "Strong" | "Moderate" | "Weak" | "None";
-    details: string;
-    slideReferences?: number[];
-  }>(),
-  
-  traction: jsonb("traction").$type<{
-    metrics: string[];
-    gaps: string[];
-    slideReferences?: number[];
-  }>(),
-  
-  businessModel: jsonb("business_model").$type<{
-    contributionMargin?: string;
-    paybackPeriod?: string;
-    cacLtvRatio?: string;
-    scalability: string;
-    risks: string[];
-    unitEconomicsComputable: boolean;
-    missingForCalculation?: string[];
-    slideReferences?: number[];
-  }>(),
-  
-  team: jsonb("team").$type<{
-    assessment: string;
-    founderMarketFit: boolean | null;
-    keyStrengths: string[];
-    keyWeaknesses: string[];
-    slideReferences?: number[];
-  }>(),
-  
-  defensibility: jsonb("defensibility").$type<{
-    moats: string[];
-    vulnerabilities: string[];
-    slideReferences?: number[];
-  }>(),
-  
-  risks: jsonb("risks").$type<{
-    tier1: {
-      risk: string;
-      severity: "High" | "Medium" | "Low";
-      likelihood: "High" | "Medium" | "Low";
-      impact: string;
-      mitigation?: string;
-      proofArtifactNeeded?: string;
-    }[];
-    tier2: {
-      risk: string;
-      severity: "High" | "Medium" | "Low";
-      likelihood: "High" | "Medium" | "Low";
-      impact: string;
-      mitigation?: string;
-      proofArtifactNeeded?: string;
-    }[];
-    tier3: {
-      risk: string;
-      severity: "High" | "Medium" | "Low";
-      likelihood: "High" | "Medium" | "Low";
-      impact: string;
-      mitigation?: string;
-      proofArtifactNeeded?: string;
-    }[];
-    tier4: {
-      risk: string;
-      severity: "High" | "Medium" | "Low";
-      likelihood: "High" | "Medium" | "Low";
-      impact: string;
-      mitigation?: string;
-      proofArtifactNeeded?: string;
-    }[];
-  }>(),
-  
-  criteriaAlignment: jsonb("criteria_alignment").$type<{
-    sectorMatch: boolean;
-    stageMatch: boolean;
-    checkSizeMatch: boolean;
-    geographyMatch: boolean;
-    dealBreakersTriggered: string[];
-  }>(),
-  
-  fundAlignment: jsonb("fund_alignment").$type<{
-    score: number;
-    sectorAnalysis?: {
-      startupSector: string;
-      matches: boolean;
-      reasoning: string;
-    };
-    stageAnalysis?: {
-      startupStage: string;
-      matches: boolean;
-      reasoning: string;
-    };
-    checkSizeAnalysis?: {
-      amountNeeded: string;
-      withinRange: boolean;
-      reasoning: string;
-    };
-    geographyAnalysis?: {
-      startupGeography: string;
-      matches: boolean;
-      reasoning: string;
-    };
-    strengths?: {
-      criterion: string;
-      howItFits: string;
-      evidence: string;
-    }[];
-    gaps?: {
-      criterion: string;
-      howItFails: string;
-      severity: "Critical" | "Moderate" | "Minor";
-    }[];
-    fundSpecificRisks?: {
-      risk: string;
-      reasoning: string;
-      impact: "High" | "Medium" | "Low";
-    }[];
-    customCriteriaAnalysis?: {
-      question: string;
-      importance: "Critical" | "Important" | "Nice to have";
-      score: number;
-      assessment: string;
-      meetsRequirement: boolean;
-    }[];
-    summaryReport?: string;
-    investmentRecommendation?: string;
-    keyTakeaways?: string[];
-    capitalEfficiency?: string;
-    pathToCashFlow?: string;
-    alignment?: string;
-    slideReferences?: number[];
-  }>(),
-  
-  useOfFunds: jsonb("use_of_funds").$type<{
-    clarity: string;
-    milestones: string[];
-    achievability: string;
-    commentary: string;
-    capitalToMilestones?: {
-      amount: string;
-      milestone: string;
-      timeline: string;
-      proofRequired: string;
-    }[];
-    slideReferences?: number[];
-  }>(),
-  
-  returnPotential: jsonb("return_potential").$type<{
-    potential10to20x: boolean | null;
-    pathTo100MARR: string;
-    timeToScale: string;
-    exitScenarios: string[];
-    slideReferences?: number[];
+    pageCount?: number;
+    jobCriteriaUsed?: string;
   }>(),
   
   missingCriticalInfo: jsonb("missing_critical_info").$type<string[]>().notNull(),
-  dataQualityScore: integer("data_quality_score").notNull(),
+  completenessScore: integer("completeness_score").notNull(),
   
-  icMemo: jsonb("ic_memo").$type<{
-    verdict: "Strong Lead" | "Track" | "Pass" | "Invest";
-    summary: string;
-    strengths: {
-      point: string;
-      evidenceTag: "Evidence" | "Inference";
-      slideReferences: number[];
+  overview: jsonb("overview").$type<{
+    candidateName?: string;
+    currentRole?: string;
+    currentCompany?: string;
+    totalExperience?: string;
+    industry?: string;
+    location?: string;
+    noticePeriod?: string;
+    salaryExpectation?: string;
+  }>(),
+  
+  careerTrajectory: jsonb("career_trajectory").$type<{
+    progression: string;
+    trend: "Upward" | "Lateral" | "Downward" | "Stable";
+    growthPattern: string;
+    keyMilestones?: string[];
+  }>(),
+  
+  workHistory: jsonb("work_history").$type<{
+    assessment: string;
+    relevantExperience: string;
+    yearsRelevant?: string;
+    companyQuality: string;
+    positions?: {
+      title: string;
+      company: string;
+      duration: string;
+      relevance: "High" | "Medium" | "Low";
+      keyAchievements?: string[];
     }[];
-    weaknesses: string[];
-    dataNeededForReconsideration: string[];
-  }>().notNull(),
+  }>(),
   
-  verdict: verdictEnum("verdict").notNull().default("Pass"),
-  recommendation: text("recommendation").notNull(),
+  experienceMatch: jsonb("experience_match").$type<{
+    score: number;
+  }>(),
+  
+  skills: jsonb("skills").$type<{
+    present?: {
+      category: string;
+      skills: string[];
+    }[];
+    gaps?: {
+      skill: string;
+      criticality: "critical" | "high" | "medium" | "low";
+      note?: string;
+    }[];
+    technicalDepth?: string;
+  }>(),
+  
+  education: jsonb("education").$type<{
+    degrees?: {
+      degree: string;
+      institution: string;
+      year: string;
+      relevance?: "High" | "Medium" | "Low";
+    }[];
+    certifications?: string[];
+    assessment?: string;
+  }>(),
+  
+  redFlags: jsonb("red_flags").$type<{
+    critical?: {
+      issue: string;
+      description: string;
+      recommendation?: string;
+    }[];
+    moderate?: {
+      issue: string;
+      description: string;
+      mitigatingFactors?: string;
+    }[];
+    minor?: string[];
+  }>(),
+  
+  roleAlignment: jsonb("role_alignment").$type<{
+    score: number;
+    hiringRecommendation?: string;
+    requirementsAssessment?: string;
+    criticalGaps?: string[];
+    keyTakeaways?: string[];
+    
+    experienceMatch?: {
+      matches: boolean;
+      candidateLevel: string;
+      reasoning: string;
+    };
+    
+    skillsMatch?: {
+      matches: boolean;
+      matchPercentage: number;
+      reasoning: string;
+    };
+    
+    seniorityMatch?: {
+      appropriate: boolean;
+      level: string;
+      reasoning: string;
+    };
+    
+    culturalFit?: {
+      score: number;
+      assessment: string;
+    };
+    
+    strengths?: {
+      area: string;
+      description: string;
+      evidence: string;
+    }[];
+    
+    gaps?: {
+      area: string;
+      description: string;
+      severity: "Critical" | "Moderate" | "Minor";
+      canBeAddressed?: boolean;
+      addressingStrategy?: string;
+    }[];
+    
+    interviewFocusAreas?: {
+      topic: string;
+      priority: "High" | "Medium" | "Low";
+      reasoning: string;
+      suggestedQuestions?: string[];
+    }[];
+    
+    comprehensiveAssessment?: string;
+  }>(),
+  
+  compensation: jsonb("compensation").$type<{
+    analysis: string;
+    withinBudget: boolean;
+    marketComparison?: string;
+  }>(),
+  
+  nextSteps: jsonb("next_steps").$type<string[]>(),
+  
+  recommendation: recommendationEnum("recommendation").notNull().default("Pass"),
+  summary: text("summary").notNull(),
   overallScore: integer("overall_score").notNull(),
   
   aiModel: text("ai_model"),
@@ -363,8 +288,8 @@ export const pitchDeckAnalysis = pgTable("pitch_deck_analysis", {
     .$onUpdate(() => new Date()),
 });
 
-// VCCriteria table - matches Mongoose IVCCriteria exactly
-export const vcCriteria = pgTable("vc_criteria", {
+// JobCriteria table - stores hiring manager's job requirements
+export const jobCriteria = pgTable("job_criteria", {
   id: text("id")
     .primaryKey()
     .$defaultFn(() => nanoid()),
@@ -372,25 +297,33 @@ export const vcCriteria = pgTable("vc_criteria", {
     .notNull()
     .unique()
     .references(() => user.id, { onDelete: "cascade" }),
-  fundName: text("fund_name").notNull(),
-  preferredSectors: jsonb("preferred_sectors").$type<string[]>(),
-  avoidedSectors: jsonb("avoided_sectors").$type<string[]>(),
-  stages: jsonb("stages").$type<string[]>(),
-  minCheckSize: integer("min_check_size").notNull(),
-  maxCheckSize: integer("max_check_size").notNull(),
-  geographicFocus: jsonb("geographic_focus").$type<string[]>(),
-  keyFocusAreas: text("key_focus_areas"),
+  jobTitle: text("job_title").notNull(),
+  department: text("department"),
+  requiredSkills: jsonb("required_skills").$type<string[]>(),
+  preferredSkills: jsonb("preferred_skills").$type<string[]>(),
+  experienceLevel: text("experience_level"), // "Entry", "Mid", "Senior", "Lead", "Executive"
+  minYearsExperience: integer("min_years_experience"),
+  maxYearsExperience: integer("max_years_experience"),
+  industryExperience: jsonb("industry_experience").$type<string[]>(),
+  minSalary: integer("min_salary").notNull(),
+  maxSalary: integer("max_salary").notNull(),
+  location: text("location"),
+  remotePolicy: text("remote_policy"), // "On-site", "Hybrid", "Remote"
+  educationRequirements: text("education_requirements"),
+  certificationRequirements: jsonb("certification_requirements").$type<string[]>(),
+  culturalFitCriteria: text("cultural_fit_criteria"),
   dealBreakers: text("deal_breakers"),
   customEvaluationCriteria: jsonb("custom_evaluation_criteria").$type<{
     question: string;
-    importance: "Critical" | "Important" | "Nice to have";
+    importance: "Critical" | "Important" | "Nice-to-have";
+    expectedAnswer?: string;
   }[]>(),
   criteriaWeights: jsonb("criteria_weights").$type<{
-    marketSize: number;
-    team: number;
-    traction: number;
-    product: number;
-    businessModel: number;
+    experience: number;
+    skills: number;
+    education: number;
+    culturalFit: number;
+    leadership: number;
   }>(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at")
@@ -400,7 +333,7 @@ export const vcCriteria = pgTable("vc_criteria", {
 });
 
 // Type exports
-export type PitchDeckAnalysis = typeof pitchDeckAnalysis.$inferSelect;
-export type NewPitchDeckAnalysis = typeof pitchDeckAnalysis.$inferInsert;
-export type VCCriteria = typeof vcCriteria.$inferSelect;
-export type NewVCCriteria = typeof vcCriteria.$inferInsert;
+export type CVAnalysis = typeof cvAnalysis.$inferSelect;
+export type NewCVAnalysis = typeof cvAnalysis.$inferInsert;
+export type JobCriteria = typeof jobCriteria.$inferSelect;
+export type NewJobCriteria = typeof jobCriteria.$inferInsert;

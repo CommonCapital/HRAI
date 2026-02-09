@@ -32,7 +32,7 @@ export default async function ContractPage({
 
     const queryClient = getQueryClient();
     void queryClient.prefetchQuery(
-       trpc.contracts.getContractById.queryOptions({ id: id })
+       trpc.candidates.getCVAnalysisById.queryOptions({ id: id })
     )
   return (
     <>

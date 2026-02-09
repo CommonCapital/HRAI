@@ -1,520 +1,660 @@
-
 'use client';
-import { Toaster } from "@/components/ui/sonner";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { ArrowRight, Brain, FileText, Database, Shield, Server, Lock, Zap, X, Menu } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, useScroll, useTransform, AnimatePresence } from "framer-motion";
+import { useState, useEffect } from "react";
+import { 
+  CheckCircle2, 
+  Clock, 
+  Users, 
+  Zap, 
+  Shield, 
+  ArrowRight,
+  Play,
+  Pause,
+  MessageSquare,
+  FileCheck,
+  Target,
+  TrendingUp
+} from "lucide-react";
 
-import "./App.css";
-import { useState } from "react";
-import Link from "next/link";
+// Simulated interview conversation
+const interviewSteps = [
+  { role: "AI", text: "Walk me through your experience with distributed systems at scale.", time: "00:02" },
+  { role: "Candidate", text: "At my previous role, I architected a system handling 50M daily requests...", time: "00:15" },
+  { role: "AI", text: "Interesting. What trade-offs did you make between consistency and availability?", time: "00:28" },
+  { role: "Candidate", text: "We prioritized eventual consistency for user-facing features...", time: "00:42" },
+  { role: "AI", text: "Can you describe a specific incident where this decision was tested?", time: "00:55" },
+];
 
-const queryClient = new QueryClient();
-
-const Page = () => {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+// Live metrics simulation
+const MetricCounter = ({ end, label, prefix = "", suffix = "" }: any) => {
+  const [count, setCount] = useState(0);
+  
+  useEffect(() => {
+    const duration = 2000;
+    const increment = end / (duration / 16);
+    let current = 0;
+    
+    const timer = setInterval(() => {
+      current += increment;
+      if (current >= end) {
+        setCount(end);
+        clearInterval(timer);
+      } else {
+        setCount(Math.floor(current));
+      }
+    }, 16);
+    
+    return () => clearInterval(timer);
+  }, [end]);
   
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <div className="min-h-screen bg-background">
-          {/* Navigation */}
-          <motion.nav 
-            className="top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border"
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, ease: "easeOut" }}
-          >
-            <div className="container mx-auto px-4 sm:px-6 py-4">
-              <div className="flex items-center justify-between">
-                <motion.div 
-                  className="flex items-center gap-2"
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.5, delay: 0.1 }}
-                >
-                  <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M16 4L4 10L16 16L28 10L16 4Z" className="fill-primary"/>
-                    <path d="M4 16L16 22L28 16" className="stroke-primary" strokeWidth="2" strokeLinecap="round"/>
-                    <path d="M4 22L16 28L28 22" className="stroke-primary" strokeWidth="2" strokeLinecap="round"/>
-                  </svg>
-                  <span className="text-lg sm:text-xl font-semibold text-black">Advisora</span>
-                 
-                </motion.div>
-                
-                <motion.div 
-                  className="hidden md:flex items-center gap-8"
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.5, delay: 0.2 }}
-                >
-                  <a href="#platform" className="text-sm text-muted-foreground hover:text-primary transition-colors hover:underline">Platform</a>
-                  <a href="#features" className="text-sm text-muted-foreground hover:text-primary transition-colors hover:underline">Capabilities</a>
-                  <a href="#security" className="text-sm text-muted-foreground hover:text-primary transition-colors hover:underline">Security</a>
-                  <a href="#pricing" className="text-sm text-muted-foreground hover:text-primary transition-colors hover:underline">Pricing</a>
-                </motion.div>
-                
-                <motion.div 
-                  className="flex items-center gap-4"
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.5, delay: 0.3 }}
-                >
-                  <Button variant="secondary" size="lg" className="hidden sm:flex bg-gradient-to-r from-blue-700 to-blue-800">
-                    Request Demo
-                  </Button>
-                  <Button variant="secondary" size="sm" className="sm:hidden bg-gradient-to-r from-blue-700 to-blue-800">
-                    Demo
-                  </Button>
-                  <button 
-                    className="md:hidden p-2 hover:bg-primary/10 rounded-lg transition-colors"
-                    onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                  >
-                    {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-                  </button>
-                </motion.div>
-              </div>
-              
-              {/* Mobile Menu */}
-              <AnimatePresence>
-                {mobileMenuOpen && (
-                  <motion.div 
-                    className="md:hidden mt-4 pb-4 space-y-3"
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    exit={{ opacity: 0, height: 0 }}
-                    transition={{ duration: 0.3 }}
-                  >
-                    <Link href="/platform" className="block text-sm text-muted-foreground hover:text-primary transition-colors py-2 hover:bg-primary/5 px-2 rounded">Platform</Link>
-                    <Link href="/features" className="block text-sm text-muted-foreground hover:text-primary transition-colors py-2 hover:bg-primary/5 px-2 rounded">Capabilities</Link>
-                    <Link href="/security" className="block text-sm text-muted-foreground hover:text-primary transition-colors py-2 hover:bg-primary/5 px-2 rounded">Security</Link>
-                    <Link href="/pricing" className="block text-sm text-muted-foreground hover:text-primary transition-colors py-2 hover:bg-primary/5 px-2 rounded">Pricing</Link>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          </motion.nav>
-
-          <main>
-            {/* Hero Section */}
-            <section className="pt-24 sm:pt-32 pb-12 sm:pb-20 px-4 sm:px-6">
-              <div className="container mx-auto">
-                <div className="grid lg:grid-cols-2 gap-8 sm:gap-12 items-center">
-                  <div className="space-y-6 sm:space-y-8">
-                    <motion.div
-                      initial={{ opacity: 0, y: 30 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.6, ease: "easeOut" }}
-                    >
-                      <span className="text-xs sm:text-sm font-medium text-primary bg-primary/10 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full">
-                        AI OS for Venture Capital
-                        
-                      </span>
-                    </motion.div>
-                    
-                    <motion.h1 
-                      className="text-4xl sm:text-5xl lg:text-7xl font-bold leading-tight text-charcoal-dark"
-                      initial={{ opacity: 0, y: 30 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.6, delay: 0.1, ease: "easeOut" }}
-                    >
-                      Let AI <span className="italic">lead the call</span><br />
-                      You lead the fund
-                    </motion.h1>
-                    
-                    <motion.p 
-                      className="text-base sm:text-lg lg:text-xl text-gray-700 leading-relaxed max-w-xl"
-                      initial={{ opacity: 0, y: 30 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.6, delay: 0.2, ease: "easeOut" }}
-                    >
-                      Advisora doesn't just attend meetings—<span className="italic">it runs them</span>. Trained on your fund's proprietary data, it interviews founders, challenges assumptions, and delivers structured insights—<span className="italic">without you on the line</span>.
-                    </motion.p>
-                    
-                    <motion.div 
-                      className="flex flex-col sm:flex-row gap-3 sm:gap-4"
-                      initial={{ opacity: 0, y: 30 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.6, delay: 0.3, ease: "easeOut" }}
-                    >
-                      <Button variant="secondary" size="lg" className="group w-full sm:w-auto hover:scale-[1.03] transition-transform duration-300 bg-gradient-to-r from-blue-700 to-blue-800">
-                        Request Demo
-                        <ArrowRight className="ml-2 group-hover:translate-x-1 transition-transform" />
-                      </Button>
-                      <Button variant="outline" size="lg" className="w-full sm:w-auto hover:scale-[1.03] transition-transform duration-300">
-                        Watch Overview
-                      </Button>
-                    </motion.div>
-                    
-                    <motion.div 
-                      className="grid grid-cols-3 gap-4 sm:gap-8 pt-4"
-                      initial={{ opacity: 0, y: 30 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.6, delay: 0.4, ease: "easeOut" }}
-                    >
-                      <div className="text-center sm:text-left">
-                        <div className="text-2xl sm:text-3xl font-bold text-gray-700">90+%</div>
-                        <div className="text-xs sm:text-sm text-muted-foreground">Call accuracy</div>
-                      </div>
-                      <div className="text-center sm:text-left border-l border-border pl-4 sm:pl-0 sm:border-l-0">
-                        <div className="text-2xl sm:text-3xl font-bold text-gray-700">+3hrs</div>
-                        <div className="text-xs sm:text-sm text-muted-foreground">Saved per call</div>
-                      </div>
-                      <div className="text-center sm:text-left border-l border-border pl-4 sm:pl-0 sm:border-l-0">
-                        <div className="text-2xl sm:text-3xl font-bold text-gray-700">24%</div>
-                        <div className="text-xs sm:text-sm text-muted-foreground">Higher response rate</div>
-                      </div>
-                    </motion.div>
-                  </div>
-                  
-                  <motion.div 
-                    className="relative mt-8 lg:mt-0"
-                    initial={{ opacity: 0, x: 50 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
-                  >
-                    <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-cyan-400 blur-3xl opacity-20 rounded-full"></div>
-                    <img 
-                      src={'/Pitch-review.png'} 
-                      alt="Advisora AI autonomously conducting a founder interview and generating insights"
-                      className="relative rounded-2xl shadow-xl border border-border hover:scale-[1.02] transition-transform duration-500 ease-out"
-                    />
-                  </motion.div>
-                </div>
-              </div>
-            </section>
-
-            {/* Value Proposition */}
-            <section className="py-12 sm:py-24 px-4 sm:px-6 bg-secondary/30">
-              <div className="container mx-auto">
-                <div className="text-center mb-10 sm:mb-16 space-y-3 sm:space-y-4">
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5, ease: "easeOut" }}
-                  >
-                    <span className="text-xs sm:text-sm font-medium text-primary bg-primary/10 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full">
-                      Foundation
-                    </span>
-                  </motion.div>
-                  <motion.h2 
-                    className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-700"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5, delay: 0.1, ease: "easeOut" }}
-                  >
-                    Built for those who delegate wisely
-                  </motion.h2>
-                  <motion.p 
-                    className="text-base sm:text-lg lg:text-xl text-gray-700 max-w-3xl mx-auto px-4"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5, delay: 0.2, ease: "easeOut" }}
-                  >
-                    The best investors don't scale by working more—they scale by trusting the right systems. Advisora is your autonomous deal screener, trained exclusively on your fund's history, voice, and judgment.
-                  </motion.p>
-                </div>
-                
-                <div className="grid sm:grid-cols-2 gap-4 sm:gap-8">
-                  {[
-                    { icon: Brain, title: "Autonomous Agent", description: "Your AI doesn't wait for prompts—it initiates, interviews, and evaluates based on your investment DNA.", badge: "Self-operating" },
-                    { icon: FileText, title: "Full-Call Ownership", description: "From scheduling to insight delivery—Advisora owns the entire workflow. You receive decisions, not drafts.", badge: "End-to-end" },
-                    { icon: Database, title: "Proprietary Scoring", description: "Trained on your memos, past deals, and partner notes—it thinks like your team, not a public model.", badge: "Your DNA" },
-                    { icon: Shield, title: "Enterprise Privacy", description: "Your data never leaves your control—run offline, on-premise, or in your VPC. Zero external exposure.", badge: "Air-gapped" }
-                  ].map((item, index) => (
-                    <motion.div
-                      key={index}
-                      initial={{ opacity: 0, y: 30 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.6, delay: 0.1 * index, ease: "easeOut" }}
-                      whileHover={{ y: -5, transition: { duration: 0.2 } }}
-                    >
-                      <Card className="p-6 sm:p-8 border-2 bg-card group cursor-pointer hover:shadow-lg transition-all duration-400 ease-out">
-                        <div className="flex items-start gap-3 sm:gap-4">
-                          <div className="p-2.5 sm:p-3 rounded-lg bg-gradient-to-br from-blue-600 to-blue-800 group-hover:scale-110 transition-transform duration-300">
-                            <item.icon className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
-                          </div>
-                          <div className="flex-1 space-y-2">
-                            <div className="flex items-center justify-between gap-2">
-                              <h3 className="text-lg sm:text-xl font-semibold text-gray-700">{item.title}</h3>
-                              <span className="text-xs font-medium text-primary bg-primary/10 px-2 sm:px-3 py-1 rounded-full whitespace-nowrap">
-                                {item.badge}
-                              </span>
-                            </div>
-                            <p className="text-sm sm:text-base text-gray-700 leading-relaxed">
-                              {item.description}
-                            </p>
-                          </div>
-                        </div>
-                      </Card>
-                    </motion.div>
-                  ))}
-                </div>
-              </div>
-            </section>
-
-            {/* Tech Stack */}
-            <section className="py-12 sm:py-24 px-4 sm:px-6">
-              <div className="container mx-auto">
-                <div className="grid lg:grid-cols-2 gap-8 sm:gap-16 items-center">
-                  <div className="space-y-6 sm:space-y-8">
-                    <motion.div
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.5, ease: "easeOut" }}
-                    >
-                      <Badge variant="outline" className="text-xs sm:text-sm font-medium border-primary text-primary px-3 sm:px-4 py-1.5 sm:py-2 hover:bg-primary/10 transition-colors">
-                        Technology & Privacy
-                      </Badge>
-                    </motion.div>
-                    
-                    <motion.h2 
-                      className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-700 leading-tight"
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.5, delay: 0.1, ease: "easeOut" }}
-                    >
-                      Engineered for trust, built to scale
-                    </motion.h2>
-                    
-                    <motion.p 
-                      className="text-base sm:text-lg lg:text-xl text-gray-700 leading-relaxed"
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.5, delay: 0.2, ease: "easeOut" }}
-                    >
-                      Every layer—from inference to storage—is designed for funds that demand control, consistency, and confidentiality.
-                    </motion.p>
-                    
-                    <div className="space-y-3 sm:space-y-4">
-                      {[
-                        { icon: Server, title: "On-Premise & Offline", description: "Deploy in your environment—no internet required." },
-                        { icon: Lock, title: "SOC 2 Compliant", description: "End-to-end encryption and granular access controls—by design." },
-                        { icon: Zap, title: "Fine-Tuned Intelligence", description: "Models trained only on your data—never on public corpora." }
-                      ].map((item, index) => (
-                        <motion.div
-                          key={index}
-                          initial={{ opacity: 0, x: -20 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ duration: 0.4, delay: 0.3 + index * 0.1, ease: "easeOut" }}
-                          whileHover={{ x: 5, transition: { duration: 0.2 } }}
-                          className="flex items-start gap-3 sm:gap-4 p-3 sm:p-4 rounded-lg hover:bg-primary/5 transition-colors group cursor-pointer"
-                        >
-                          <div className="p-2 rounded-lg bg-primary/10 group-hover:bg-primary/20 group-hover:scale-110 transition-transform duration-200">
-                            <item.icon className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
-                          </div>
-                          <div>
-                            <h4 className="text-sm sm:text-base font-semibold text-gray-700 mb-1">{item.title}</h4>
-                            <p className="text-xs sm:text-sm text-gray-700">{item.description}</p>
-                          </div>
-                        </motion.div>
-                      ))}
-                    </div>
-                  </div>
-                  
-                  <motion.div 
-                    className="bg-gray-800 rounded-2xl p-6 sm:p-8 text-white space-y-4 sm:space-y-6 hover:shadow-2xl transition-shadow duration-500 mt-8 lg:mt-0"
-                    initial={{ opacity: 0, x: 50 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.7, delay: 0.2, ease: "easeOut" }}
-                  >
-                    <div className="space-y-2">
-                      <div className="text-xs sm:text-sm text-white/60">Data Room Connectors</div>
-                      <div className="flex flex-wrap gap-1.5 sm:gap-2">
-                        {['Dropbox', 'Box', 'Google Drive', 'OneDrive', 'S3'].map((tool, index) => (
-                          <motion.span 
-                            key={tool}
-                            initial={{ opacity: 0, scale: 0.8 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            transition={{ duration: 0.3, delay: 0.3 + index * 0.05 }}
-                            className="px-2 sm:px-3 py-1 bg-white/10 rounded-md text-xs sm:text-sm hover:bg-white/20 transition-colors cursor-pointer"
-                          >
-                            {tool}
-                          </motion.span>
-                        ))}
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <div className="text-xs sm:text-sm text-white/60">CRM Integrations</div>
-                      <div className="flex flex-wrap gap-1.5 sm:gap-2">
-                        {['Affinity', 'Salesforce', 'HubSpot', 'Airtable'].map((tool, index) => (
-                          <motion.span 
-                            key={tool}
-                            initial={{ opacity: 0, scale: 0.8 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            transition={{ duration: 0.3, delay: 0.4 + index * 0.05 }}
-                            className="px-2 sm:px-3 py-1 bg-white/10 rounded-md text-xs sm:text-sm hover:bg-white/20 transition-colors cursor-pointer"
-                          >
-                            {tool}
-                          </motion.span>
-                        ))}
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <div className="text-xs sm:text-sm text-white/60">AI Stack</div>
-                      <div className="flex flex-wrap gap-1.5 sm:gap-2">
-                        {['Custom LLMs', 'Vector DB', 'Proprietary Embeddings', 'On-Device Inference'].map((tool, index) => (
-                          <motion.span 
-                            key={tool}
-                            initial={{ opacity: 0, scale: 0.8 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            transition={{ duration: 0.3, delay: 0.5 + index * 0.05 }}
-                            className="px-2 sm:px-3 py-1 bg-white/10 rounded-md text-xs sm:text-sm hover:bg-white/20 transition-colors cursor-pointer"
-                          >
-                            {tool}
-                          </motion.span>
-                        ))}
-                      </div>
-                    </div>
-                    
-                    <motion.div 
-                      className="pt-3 sm:pt-4 border-t border-white/10"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ duration: 0.5, delay: 0.7 }}
-                    >
-                      <div className="text-xs sm:text-sm text-white/80">
-                        Seamless integration. Zero workflow disruption.
-                      </div>
-                    </motion.div>
-                  </motion.div>
-                </div>
-              </div>
-            </section>
-
-            {/* CTA Section */}
-            <section className="py-12 sm:py-24 px-4 sm:px-6">
-              <div className="container mx-auto">
-                <motion.div 
-                  className="bg-gradient-to-r from-blue-700 to-blue-800 rounded-2xl sm:rounded-3xl p-8 sm:p-12 md:p-16 text-center text-white relative overflow-hidden hover:shadow-2xl transition-shadow duration-500"
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ duration: 0.8, ease: "easeOut" }}
-                >
-                  <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAxMCAwIEwgMCAwIDAgMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS1vcGFjaXR5PSIwLjA1IiBzdHJva2Utd2lkdGg9IjEiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InVybCgjZ3JpZCkiLz48L3N2Zz4=')] opacity-20"></div>
-                  
-                  <div className="relative z-10 space-y-4 sm:space-y-6 max-w-3xl mx-auto">
-                    <motion.h2 
-                      className="text-3xl sm:text-4xl md:text-5xl font-bold"
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.5, delay: 0.2 }}
-                    >
-                      Ready to delegate with confidence?
-                    </motion.h2>
-                    <motion.p 
-                      className="text-base sm:text-lg md:text-xl text-white/90 max-w-2xl mx-auto px-4"
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.5, delay: 0.3 }}
-                    >
-                      Join leading venture teams who trust Advisora to screen deals—<span className="italic">so they can focus on what only humans can do</span>.
-                    </motion.p>
-                    
-                    <motion.div 
-                      className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center pt-2 sm:pt-4"
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.5, delay: 0.4 }}
-                    >
-                      <Button 
-                        variant="outline" 
-                        size="lg"
-                        className="bg-white hover:bg-white/90 hover:scale-[1.03] text-primary border-white group transition-transform duration-300 w-full sm:w-auto"
-                      >
-                        Request Demo
-                        <ArrowRight className="ml-2 group-hover:translate-x-1 transition-transform" />
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="lg"
-                        className="text-white hover:bg-white/10 hover:scale-[1.03] border border-white/20 transition-transform duration-300 w-full sm:w-auto"
-                      >
-                        Schedule Call
-                      </Button>
-                    </motion.div>
-                  </div>
-                </motion.div>
-              </div>
-            </section>
-          </main>
-
-          {/* Footer */}
-          <footer className="py-8 sm:py-12 px-4 sm:px-6 border-t border-border">
-            <div className="container mx-auto">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8">
-                <motion.div 
-                  className="space-y-3 sm:space-y-4 col-span-2 md:col-span-1"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5 }}
-                >
-                  <div className="flex items-center gap-2">
-                    <svg width="24" height="24" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" className="sm:w-7 sm:h-7">
-                      <path d="M16 4L4 10L16 16L28 10L16 4Z" className="fill-primary"/>
-                      <path d="M4 16L16 22L28 16" className="stroke-primary" strokeWidth="2" strokeLinecap="round"/>
-                      <path d="M4 22L16 28L28 22" className="stroke-primary" strokeWidth="2" strokeLinecap="round"/>
-                    </svg>
-                    <span className="text-base sm:text-lg font-semibold text-charcoal">Advisora</span>
-                  </div>
-                  <p className="text-xs sm:text-sm text-gray-700">
-                    AI OS for Venture Capital
-                  </p>
-                </motion.div>
-                
-                {[
-                  { title: "Platform", links: ["Capabilities", "Integrations", "Security", "Pricing"] },
-                  { title: "Company", links: ["About", "Blog", "Careers", "Contact"] },
-                  { title: "Resources", links: ["Documentation", "API Reference", "Support", "Status"] }
-                ].map((section, sectionIndex) => (
-                  <motion.div 
-                    key={section.title}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5, delay: 0.1 * (sectionIndex + 1) }}
-                  >
-                    <h4 className="font-semibold text-gray-700 mb-2 sm:mb-3 text-sm sm:text-base">{section.title}</h4>
-                    <ul className="space-y-1.5 sm:space-y-2 text-xs sm:text-sm text-gray-700">
-                      {section.links.map((link) => (
-                        <li key={link}>
-                          <a href="#" className="hover:text-primary transition-colors hover:underline">{link}</a>
-                        </li>
-                      ))}
-                    </ul>
-                  </motion.div>
-                ))}
-              </div>
-              
-              <motion.div 
-                className="mt-8 sm:mt-12 pt-6 sm:pt-8 border-t border-border flex flex-col md:flex-row justify-between items-center gap-3 sm:gap-4 text-center md:text-left"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.6, delay: 0.4 }}
-              >
-                <p className="text-xs sm:text-sm text-gray-700">
-                  © 2025 Advisora. All rights reserved.
-                </p>
-                <div className="flex flex-wrap gap-4 sm:gap-6 text-xs sm:text-sm text-gray-700 justify-center">
-                  <a href="#" className="hover:text-primary transition-colors hover:underline">Privacy Policy</a>
-                  <a href="#" className="hover:text-primary transition-colors hover:underline">Terms of Service</a>
-                  <a href="#" className="hover:text-primary transition-colors hover:underline">Cookie Policy</a>
-                </div>
-              </motion.div>
-            </div>
-          </footer>
-        </div>
-      </TooltipProvider>
-    </QueryClientProvider>
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      className="text-center"
+    >
+      <div className="font-mono text-5xl font-semibold text-primary mb-2">
+        {prefix}{count}{suffix}
+      </div>
+      <div className="text-sm font-light tracking-wide uppercase opacity-60">{label}</div>
+    </motion.div>
   );
 };
 
-export default Page;
+// Workflow step component
+const WorkflowStep = ({ number, title, description, delay }: any) => (
+  <motion.div
+    initial={{ opacity: 0, x: -50 }}
+    whileInView={{ opacity: 1, x: 0 }}
+    viewport={{ once: true }}
+    transition={{ delay, duration: 0.5 }}
+    whileHover={{ x: 8 }}
+    className="flex gap-6 group cursor-pointer"
+  >
+    <div className="flex-shrink-0">
+      <motion.div 
+        className="w-12 h-12 border-2 border-primary flex items-center justify-center font-mono text-xl font-semibold"
+        whileHover={{ scale: 1.1, rotate: 5 }}
+      >
+        {number}
+      </motion.div>
+    </div>
+    <div className="flex-1">
+      <h3 className="text-xl font-semibold mb-2 tracking-tight">{title}</h3>
+      <p className="text-sm font-light leading-relaxed opacity-80">{description}</p>
+    </div>
+  </motion.div>
+);
+
+// Feature card with inversion hover
+const FeatureCard = ({ icon: Icon, title, value, delay }: any) => (
+  <motion.div
+    initial={{ opacity: 0, scale: 0.9 }}
+    whileInView={{ opacity: 1, scale: 1 }}
+    viewport={{ once: true }}
+    transition={{ delay, duration: 0.4 }}
+    whileHover={{ 
+      scale: 1.02,
+      backgroundColor: "#FF6A00",
+      color: "#FFFFFF",
+      transition: { duration: 0.2 }
+    }}
+    className="p-8 border border-primary/10 shadow-orange-md hover:shadow-orange-lg transition-all"
+  >
+    <Icon className="w-8 h-8 mb-4" strokeWidth={1.5} />
+    <div className="font-mono text-3xl font-semibold mb-2">{value}</div>
+    <div className="text-sm font-light tracking-wide uppercase">{title}</div>
+  </motion.div>
+);
+
+export default function HRAILanding() {
+  const [demoPlaying, setDemoPlaying] = useState(true);
+  const [currentStep, setCurrentStep] = useState(0);
+  const { scrollYProgress } = useScroll();
+  const opacity = useTransform(scrollYProgress, [0, 0.2], [1, 0]);
+  
+  // Auto-advance interview demo
+  useEffect(() => {
+    if (!demoPlaying) return;
+    
+    const timer = setInterval(() => {
+      setCurrentStep((prev) => (prev + 1) % interviewSteps.length);
+    }, 3000);
+    
+    return () => clearInterval(timer);
+  }, [demoPlaying]);
+
+  return (
+    <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
+      {/* Progress indicator */}
+      <motion.div 
+        className="fixed top-0 left-0 right-0 h-1 bg-primary origin-left z-50"
+        style={{ scaleX: scrollYProgress }}
+      />
+
+      {/* Hero Section - Immediate Demo */}
+      <section className="min-h-screen flex items-center justify-center px-6 relative">
+        <motion.div 
+          className="absolute inset-0 opacity-5"
+          style={{ opacity }}
+        >
+          <div className="absolute inset-0" style={{
+            backgroundImage: `linear-gradient(to right, rgba(255,106,0,0.1) 1px, transparent 1px),
+                             linear-gradient(to bottom, rgba(255,106,0,0.1) 1px, transparent 1px)`,
+            backgroundSize: '80px 80px'
+          }} />
+        </motion.div>
+
+        <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-16 items-center relative z-10">
+          {/* Left: Value Prop */}
+          <div className="space-y-8">
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6 }}
+            >
+              <motion.div 
+                className="inline-block mb-6 px-4 py-2 border border-primary/30 text-xs tracking-widest uppercase font-light"
+                animate={{ 
+                  letterSpacing: ["0.1em", "0.15em", "0.1em"],
+                }}
+                transition={{ 
+                  duration: 3,
+                  repeat: Infinity,
+                  ease: "easeInOut"
+                }}
+              >
+                Autonomous HR Intelligence
+              </motion.div>
+              
+              <h1 className="text-6xl lg:text-7xl font-semibold leading-none mb-6 tracking-tight">
+                <motion.span
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.2 }}
+                >
+                  Hiring that
+                </motion.span>
+                <br />
+                <motion.span
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.4 }}
+                  className="italic font-light"
+                >
+                  runs itself
+                </motion.span>
+              </h1>
+              
+              <motion.p 
+                className="text-lg font-light leading-relaxed max-w-xl opacity-80"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 0.8 }}
+                transition={{ delay: 0.6 }}
+              >
+                Train custom AI agents on your hiring standards. They screen, interview, 
+                verify, and recommend—autonomously. No black boxes. No bias. Just structured 
+                intelligence at scale.
+              </motion.p>
+            </motion.div>
+
+            <motion.div 
+              className="flex gap-4"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.8 }}
+            >
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="px-8 h-12 bg-primary text-white text-sm tracking-widest uppercase font-light border-2 border-primary hover:bg-white hover:text-primary transition-colors"
+              >
+                Deploy Agent
+              </motion.button>
+              
+              <motion.button
+                whileHover={{ scale: 1.05, backgroundColor: "#FF6A00", color: "#FFFFFF" }}
+                whileTap={{ scale: 0.95 }}
+                className="px-8 h-12 border-2 border-primary text-primary text-sm tracking-widest uppercase font-light hover:bg-primary hover:text-white transition-all"
+              >
+                Watch Demo
+              </motion.button>
+            </motion.div>
+
+            {/* Live Stats */}
+            <motion.div 
+              className="grid grid-cols-3 gap-6 pt-8 border-t border-primary/10"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 1 }}
+            >
+              <div className="text-center">
+                <div className="font-mono text-2xl font-semibold">94<span className="text-lg">%</span></div>
+                <div className="text-xs uppercase tracking-wide opacity-60 mt-1">Accuracy</div>
+              </div>
+              <div className="text-center border-l border-primary/10">
+                <div className="font-mono text-2xl font-semibold">3.2<span className="text-lg">hr</span></div>
+                <div className="text-xs uppercase tracking-wide opacity-60 mt-1">Time Saved</div>
+              </div>
+              <div className="text-center border-l border-primary/10">
+                <div className="font-mono text-2xl font-semibold">10<span className="text-lg">x</span></div>
+                <div className="text-xs uppercase tracking-wide opacity-60 mt-1">Faster</div>
+              </div>
+            </motion.div>
+          </div>
+
+          {/* Right: Live Interview Demo */}
+          <motion.div
+            initial={{ opacity: 0, x: 50 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.8, delay: 0.3 }}
+            className="relative"
+          >
+            <div className="border-2 border-primary/20 shadow-orange-xl bg-white p-8">
+              {/* Demo Controls */}
+              <div className="flex items-center justify-between mb-6 pb-4 border-b border-primary/10">
+                <div className="flex items-center gap-3">
+                  <div className="w-3 h-3 rounded-full bg-primary animate-pulse" />
+                  <span className="text-xs uppercase tracking-widest font-light">Live Interview</span>
+                </div>
+                <button 
+                  onClick={() => setDemoPlaying(!demoPlaying)}
+                  className="p-2 hover:bg-primary/5 transition-colors"
+                >
+                  {demoPlaying ? <Pause size={16} /> : <Play size={16} />}
+                </button>
+              </div>
+
+              {/* Interview Conversation */}
+              <div className="space-y-4 min-h-[400px]">
+                <AnimatePresence mode="wait">
+                  {interviewSteps.slice(0, currentStep + 1).map((step, index) => (
+                    <motion.div
+                      key={index}
+                      initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.95 }}
+                      transition={{ duration: 0.3 }}
+                      className={`flex gap-4 ${step.role === 'AI' ? 'justify-start' : 'justify-end'}`}
+                    >
+                      <div className={`max-w-[80%] ${step.role === 'AI' ? 'order-1' : 'order-2'}`}>
+                        <div className="text-xs uppercase tracking-widest mb-2 opacity-60 flex items-center gap-2">
+                          {step.role === 'AI' && <Zap size={12} />}
+                          {step.role}
+                          <span className="font-mono">{step.time}</span>
+                        </div>
+                        <div className={`p-4 border ${step.role === 'AI' ? 'border-primary/30 bg-primary/5' : 'border-primary/10'}`}>
+                          <p className="text-sm font-light leading-relaxed">{step.text}</p>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </div>
+
+              {/* Real-time Analysis Bar */}
+              <motion.div 
+                className="mt-6 pt-6 border-t border-primary/10"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 1 }}
+              >
+                <div className="flex items-center justify-between text-xs mb-2">
+                  <span className="uppercase tracking-widest opacity-60">Analyzing Response</span>
+                  <span className="font-mono">78%</span>
+                </div>
+                <div className="h-1 bg-primary/10 overflow-hidden">
+                  <motion.div 
+                    className="h-full bg-primary"
+                    initial={{ width: "0%" }}
+                    animate={{ width: "78%" }}
+                    transition={{ duration: 1.5, ease: "easeOut" }}
+                  />
+                </div>
+              </motion.div>
+            </div>
+
+            {/* Floating Agent Status */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 1.2 }}
+              className="absolute -bottom-6 -right-6 bg-primary text-white p-6 shadow-orange-xl"
+            >
+              <div className="text-xs uppercase tracking-widest mb-2 opacity-80">Agent Status</div>
+              <div className="font-mono text-2xl font-semibold">Active</div>
+              <div className="text-xs mt-2 opacity-80">Candidate #247</div>
+            </motion.div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* Workflow Visualization */}
+      <section className="py-32 px-6 bg-primary/5">
+        <div className="max-w-6xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="text-center mb-20"
+          >
+            <div className="inline-block mb-6 px-4 py-2 border border-primary/30 text-xs tracking-widest uppercase font-light">
+              End-to-End Autonomy
+            </div>
+            <h2 className="text-5xl font-semibold mb-6">How it works</h2>
+            <p className="text-lg font-light opacity-80 max-w-2xl mx-auto">
+              Five autonomous steps. Zero human intervention required.
+            </p>
+          </motion.div>
+
+          <div className="space-y-12">
+            <WorkflowStep 
+              number="01"
+              title="Define Standards"
+              description="You set the hiring criteria, red flags, and evaluation framework. The agent learns your company's unique requirements."
+              delay={0}
+            />
+            <WorkflowStep 
+              number="02"
+              title="Resume Screening"
+              description="AI verifies claims, checks references, and flags inconsistencies automatically. No keyword matching—actual comprehension."
+              delay={0.1}
+            />
+            <WorkflowStep 
+              number="03"
+              title="Schedule & Interview"
+              description="Agent coordinates calendars and conducts structured interviews via text or voice. Every candidate gets the same rigorous evaluation."
+              delay={0.2}
+            />
+            <WorkflowStep 
+              number="04"
+              title="Verification"
+              description="Cross-references employment history, validates technical claims, and assesses cultural alignment against your standards."
+              delay={0.3}
+            />
+            <WorkflowStep 
+              number="05"
+              title="Deliver Insights"
+              description="Structured reports with fit scores, strengths, weaknesses, and clear hiring recommendations. Fully auditable."
+              delay={0.4}
+            />
+          </div>
+
+          {/* Process Flow Visualization */}
+          <motion.div 
+            className="mt-20 grid grid-cols-5 gap-4"
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true }}
+          >
+            {['Define', 'Screen', 'Interview', 'Verify', 'Deliver'].map((label, index) => (
+              <motion.div
+                key={label}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: index * 0.1 }}
+                className="relative"
+              >
+                <div className="h-32 border-2 border-primary/20 flex items-center justify-center hover:border-primary/60 hover:shadow-orange-md transition-all">
+                  <span className="text-sm font-mono uppercase tracking-widest">{label}</span>
+                </div>
+                {index < 4 && (
+                  <div className="absolute top-1/2 -right-2 transform -translate-y-1/2 z-10">
+                    <ArrowRight className="text-primary" size={16} />
+                  </div>
+                )}
+              </motion.div>
+            ))}
+          </motion.div>
+        </div>
+      </section>
+
+      {/* Live Metrics Dashboard */}
+      <section className="py-32 px-6">
+        <div className="max-w-6xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="text-center mb-20"
+          >
+            <div className="inline-block mb-6 px-4 py-2 border border-primary/30 text-xs tracking-widest uppercase font-light">
+              Performance at Scale
+            </div>
+            <h2 className="text-5xl font-semibold mb-6">Built for volume</h2>
+          </motion.div>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+            <FeatureCard icon={Users} title="Candidates Screened" value="12,847" delay={0} />
+            <FeatureCard icon={Clock} title="Hours Saved" value="8,920" delay={0.1} />
+            <FeatureCard icon={CheckCircle2} title="Accuracy Rate" value="94%" delay={0.2} />
+            <FeatureCard icon={TrendingUp} title="Quality Hires" value="+47%" delay={0.3} />
+          </div>
+
+          {/* Real-time Activity Feed */}
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="mt-20 border-2 border-primary/20 p-8 shadow-orange-lg"
+          >
+            <div className="flex items-center justify-between mb-8">
+              <h3 className="text-2xl font-semibold tracking-tight">Live Activity</h3>
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                <span className="text-xs uppercase tracking-widest font-light">Real-time</span>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              {[
+                { action: "Interview completed", candidate: "Sarah K.", role: "Senior Engineer", score: 87 },
+                { action: "Resume verified", candidate: "Michael T.", role: "Product Designer", score: 92 },
+                { action: "Screening started", candidate: "Jennifer L.", role: "Data Scientist", score: null },
+                { action: "Interview scheduled", candidate: "Robert M.", role: "Backend Dev", score: null },
+              ].map((activity, index) => (
+                <motion.div
+                  key={index}
+                  initial={{ opacity: 0, x: -20 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: index * 0.1 }}
+                  whileHover={{ x: 8 }}
+                  className="flex items-center justify-between p-4 border border-primary/10 hover:border-primary/30 hover:shadow-orange-sm transition-all cursor-pointer"
+                >
+                  <div className="flex items-center gap-4">
+                    <MessageSquare size={20} className="opacity-60" />
+                    <div>
+                      <div className="text-sm font-semibold">{activity.action}</div>
+                      <div className="text-xs opacity-60 mt-1">
+                        {activity.candidate} · {activity.role}
+                      </div>
+                    </div>
+                  </div>
+                  {activity.score && (
+                    <div className="font-mono text-lg font-semibold">{activity.score}</div>
+                  )}
+                </motion.div>
+              ))}
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* Trust & Control */}
+      <section className="py-32 px-6 bg-primary/5">
+        <div className="max-w-6xl mx-auto">
+          <div className="grid lg:grid-cols-2 gap-16 items-center">
+            <motion.div
+              initial={{ opacity: 0, x: -50 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+            >
+              <div className="inline-block mb-6 px-4 py-2 border border-primary/30 text-xs tracking-widest uppercase font-light">
+                Transparency First
+              </div>
+              <h2 className="text-5xl font-semibold mb-6 leading-tight">
+                Control every decision
+              </h2>
+              <p className="text-lg font-light leading-relaxed opacity-80 mb-8">
+                Unlike black-box AI, HRAI shows exactly how decisions are made. 
+                Every evaluation is traceable, auditable, and aligned to your standards.
+              </p>
+
+              <div className="space-y-6">
+                {[
+                  { icon: Shield, title: "Full Auditability", desc: "Every decision logged and explainable" },
+                  { icon: Target, title: "Your Standards Only", desc: "Trained on your hiring logic, not generic patterns" },
+                  { icon: FileCheck, title: "Bias Detection", desc: "Automatic flagging of inconsistent evaluations" },
+                ].map((item, index) => (
+                  <motion.div
+                    key={index}
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: index * 0.1 }}
+                    className="flex gap-4 items-start"
+                  >
+                    <div className="p-3 border-2 border-primary/20">
+                      <item.icon size={24} strokeWidth={1.5} />
+                    </div>
+                    <div>
+                      <h4 className="font-semibold mb-1">{item.title}</h4>
+                      <p className="text-sm font-light opacity-80">{item.desc}</p>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, x: 50 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              className="border-2 border-primary/20 p-8 shadow-orange-xl bg-white"
+            >
+              <div className="mb-6 pb-4 border-b border-primary/10">
+                <h4 className="text-sm uppercase tracking-widest font-light mb-4">Decision Breakdown</h4>
+              </div>
+
+              <div className="space-y-6">
+                {[
+                  { label: "Technical Skills", score: 92, color: "primary" },
+                  { label: "Communication", score: 87, color: "primary" },
+                  { label: "Cultural Fit", score: 78, color: "primary" },
+                  { label: "Experience Level", score: 95, color: "primary" },
+                ].map((metric, index) => (
+                  <motion.div
+                    key={index}
+                    initial={{ opacity: 0, x: -20 }}
+                    whileInView={{ opacity: 1, x: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: index * 0.1 }}
+                  >
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-sm font-light">{metric.label}</span>
+                      <span className="font-mono text-sm font-semibold">{metric.score}</span>
+                    </div>
+                    <div className="h-2 bg-primary/10 overflow-hidden">
+                      <motion.div 
+                        className="h-full bg-primary"
+                        initial={{ width: 0 }}
+                        whileInView={{ width: `${metric.score}%` }}
+                        viewport={{ once: true }}
+                        transition={{ duration: 1, delay: index * 0.1 }}
+                      />
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+
+              <motion.div 
+                className="mt-8 pt-6 border-t border-primary/10"
+                initial={{ opacity: 0 }}
+                whileInView={{ opacity: 1 }}
+                viewport={{ once: true }}
+              >
+                <div className="flex justify-between items-center">
+                  <span className="text-sm uppercase tracking-widest font-light">Overall Score</span>
+                  <span className="font-mono text-3xl font-semibold">88</span>
+                </div>
+                <div className="mt-4 text-xs uppercase tracking-widest opacity-60">
+                  Recommendation: <span className="text-primary font-semibold">Strong Hire</span>
+                </div>
+              </motion.div>
+            </motion.div>
+          </div>
+        </div>
+      </section>
+
+      {/* CTA */}
+      <section className="py-32 px-6">
+        <div className="max-w-4xl mx-auto text-center">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            viewport={{ once: true }}
+            className="border-4 border-primary p-16 shadow-orange-xl"
+          >
+            <h2 className="text-5xl font-semibold mb-6">
+              Start hiring autonomously
+            </h2>
+            <p className="text-lg font-light opacity-80 mb-12 max-w-2xl mx-auto">
+              Deploy your first AI agent in minutes. No engineering required. 
+              Full control from day one.
+            </p>
+
+            <div className="flex gap-6 justify-center">
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="px-12 h-14 bg-primary text-white text-sm tracking-widest uppercase font-light border-2 border-primary hover:bg-white hover:text-primary transition-colors"
+              >
+                Deploy Now
+              </motion.button>
+              
+              <motion.button
+                whileHover={{ scale: 1.05, backgroundColor: "#FF6A00", color: "#FFFFFF" }}
+                whileTap={{ scale: 0.95 }}
+                className="px-12 h-14 border-2 border-primary text-primary text-sm tracking-widest uppercase font-light transition-all"
+              >
+                Book Demo
+              </motion.button>
+            </div>
+
+            <motion.div
+              initial={{ opacity: 0 }}
+              whileInView={{ opacity: 1 }}
+              viewport={{ once: true }}
+              transition={{ delay: 0.3 }}
+              className="mt-12 pt-8 border-t border-primary/10"
+            >
+              <div className="grid grid-cols-3 gap-8">
+                <MetricCounter end={247} label="Active Agents" />
+                <MetricCounter end={12847} label="Candidates Screened" />
+                <MetricCounter end={94} label="Success Rate" suffix="%" />
+              </div>
+            </motion.div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="py-12 px-6 border-t border-primary/10">
+        <div className="max-w-6xl mx-auto">
+          <div className="flex justify-between items-center">
+            <div>
+              <div className="text-2xl font-semibold mb-2">HRAI</div>
+              <div className="text-xs uppercase tracking-widest opacity-60">Autonomous HR Intelligence</div>
+            </div>
+            <div className="text-xs uppercase tracking-widest opacity-60">
+              © 2026 — Built for scalable hiring
+            </div>
+          </div>
+        </div>
+      </footer>
+    </div>
+  );
+}

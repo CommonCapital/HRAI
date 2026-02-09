@@ -29,15 +29,11 @@ const firstSection = [
   {
    
       icon: LayoutDashboard,
-      label: "Deck-Analysis",
+      label: "CV-Analysis",
       href: "/user-contract",
     
   },
-   {
-      icon: FileText,
-      label: "Results",
-      href: "/results",
-    },
+  
   {
     icon: VideoIcon,
     label: "Meetings",
@@ -71,7 +67,7 @@ export const DashboardSidebar = () => {
     <Sidebar className="bg-radial from-blue-800 to-blue-950 text-sidebar-accent-foreground">
       <SidebarHeader className= "bg-radial from-blue-800 to-blue-950 text-sidebar-accent-foreground ">
         <Link href="/" className="flex items-center gap-2 px-2 pt-2">
-          <Image src="/logo.svg" alt="logo" height={250} width={250} />
+         
         </Link>
       </SidebarHeader>
       <div className="bg-radial from-blue-800 to-blue-950 px-4 py-2">

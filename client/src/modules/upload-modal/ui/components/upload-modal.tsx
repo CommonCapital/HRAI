@@ -33,41 +33,45 @@ export function UploadModal({
   
   const queryClient = useQueryClient();
   const router = useRouter();
-const trpc = useTRPC()
-const uploadMutation = useMutation(
-  trpc.contracts.analyzeContract.mutationOptions({
-    onSuccess: (data) => {
-      toast("Analysis Complete!", {
-        description: "Opening results...",
-        duration: 2000,
-      });
-      queryClient.invalidateQueries({ queryKey: ["user-contracts"] });
-      onUploadComplete();
-      handleClose();
-      
-      setTimeout(() => {
-        console.log("🚀 REDIRECTING TO:", `/dashboard/contract/${data.id}`);
-        router.push(`/contract/${data.id}`);
-      }, 500);
-    },
-    onError: (error) => {
-      toast("Analysis Failed", {
-        description: error.message || "Failed to analyze pitch deck",
-      });
-    },
-  })
-);
+  const trpc = useTRPC();
+  
+  /* ✅ BACKEND: candidates.analyzeCV mutation
+   * Input: { file: { buffer, originalname, size }, criteriaText?, cvSource? }
+   * Returns: CVAnalysis with id field
+   */
+  const uploadMutation = useMutation(
+    trpc.candidates.analyzeCV.mutationOptions({
+      onSuccess: (data) => {
+        toast("Analysis Complete!", {
+          description: "Opening results...",
+          duration: 2000,
+        });
+        /* ✅ BACKEND: Invalidate candidates query cache */
+        queryClient.invalidateQueries({ queryKey: ["candidates"] });
+        onUploadComplete();
+        handleClose();
+        
+        setTimeout(() => {
+          /* ✅ ROUTE: /candidate/${id} matches backend structure */
+          console.log("🚀 REDIRECTING TO:", `/candidate/${data.id}`);
+          router.push(`/candidate/${data.id}`);
+        }, 500);
+      },
+      onError: (error) => {
+        toast("Analysis Failed", {
+          description: error.message || "Failed to analyze CV/resume",
+        });
+      },
+    })
+  );
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile && selectedFile.type === "application/pdf") {
       setFile(selectedFile);
     } else {
-      toast(
-         "Invalid File",
-        {
-        
+      toast("Invalid File", {
         description: "Please upload a PDF file",
-        
       });
     }
   };
@@ -76,27 +80,30 @@ const uploadMutation = useMutation(
     e.preventDefault();
 
     if (!file) {
-      toast(
-         "No File Selected",
-        {
-        
-        description: "Please select a PDF file to analyze",
-       
+      toast("No File Selected", {
+        description: "Please select a PDF CV/resume to analyze",
       });
       return;
     }
-const arrayBuffer = await file.arrayBuffer();
-  const base64 = Buffer.from(arrayBuffer).toString('base64');
 
- uploadMutation.mutate({
-    file: {
-      buffer: base64,
-      originalname: file.name,
-      size: file.size,
-    },
-    criteriaText: criteriaText || undefined,
-    deckSource: "Upload form",
-  });
+    const arrayBuffer = await file.arrayBuffer();
+    const base64 = Buffer.from(arrayBuffer).toString('base64');
+
+    /* ✅ BACKEND: Mutation input matches cv-analysis.controllers.ts
+     * Expected fields:
+     * - file: { buffer: string, originalname: string, size: number }
+     * - criteriaText?: string (optional job requirements)
+     * - cvSource?: string (source tracking)
+     */
+    uploadMutation.mutate({
+      file: {
+        buffer: base64,
+        originalname: file.name,
+        size: file.size,
+      },
+      criteriaText: criteriaText || undefined,
+      cvSource: "Upload form",
+    });
   };
 
   const handleClose = () => {
@@ -115,69 +122,71 @@ const arrayBuffer = await file.arrayBuffer();
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-2xl">
-            <Sparkles className="size-6 text-purple-600" />
-            Analyze Pitch Deck
+            <Sparkles className="size-6 text-blue-600" />
+            Analyze CV/Resume
           </DialogTitle>
           <DialogDescription>
             {uploadMutation.isPending 
-              ? "Analyzing your pitch deck with AI... This may take 30-60 seconds."
-              : "Upload a pitch deck and optionally specify your evaluation criteria"
+              ? "Analyzing the CV with AI... This may take 30-60 seconds."
+              : "Upload a CV/resume and optionally specify your job requirements"
             }
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6 mt-4">
-          {/* Criteria Text Area */}
+          {/* Job Criteria Text Area */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label htmlFor="criteria" className="text-sm font-semibold">
-                Evaluation Criteria (Optional)
+                Job Requirements (Optional)
               </Label>
               <div className="flex gap-1">
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => setCriteriaText(`B2B SaaS, Series A, min $2M ARR, strong tech team
-Preferred: Enterprise, AI/ML
-Gross margin >70%, CAC payback <12mo
-Avoid: Consumer, hardware`)}
+                  onClick={() => setCriteriaText(`Senior Backend Engineer
+Required: Python, Django, PostgreSQL, 5+ years
+Preferred: AWS, Docker, Kubernetes
+Must have: Team leadership, system design
+Avoid: No production experience`)}
                   className="text-xs h-7"
                 >
-                  Growth VC
+                  Backend Eng
                 </Button>
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => setCriteriaText(`Seed to Series A, $500K-$3M ARR
-Technical founders, 10+ customers
-Capital efficient
-Avoid: B2C, pre-revenue`)}
+                  onClick={() => setCriteriaText(`Full Stack Developer, 3-5 years
+Required: React, Node.js, TypeScript
+Preferred: Next.js, tRPC, Tailwind
+Remote OK, $120k-$150k
+Must have: Portfolio, GitHub`)}
                   className="text-xs h-7"
                 >
-                  Early Stage
+                  Full Stack
                 </Button>
               </div>
             </div>
             <Textarea
               id="criteria"
-              placeholder="Example: B2B SaaS, Series A, min $2M ARR, strong tech team. Preferred: Enterprise, AI/ML. Avoid: Consumer apps, hardware."
+              placeholder="Example: Senior Backend Engineer, 5+ years Python/Django, AWS experience required, team leadership preferred. $150k-$180k range."
               value={criteriaText}
               onChange={(e: any) => setCriteriaText(e.target.value)}
               className="min-h-[120px] resize-none font-mono text-sm"
             />
             <p className="text-xs text-gray-500">
-              💡 Write naturally - AI understands various formats. Include deal breakers and financial requirements.
+              💡 Write naturally - AI understands various formats. Include required skills, experience level, and deal-breakers.
             </p>
           </div>
 
           {/* File Upload */}
           <div className="space-y-2">
             <Label htmlFor="file" className="text-sm font-semibold">
-              Upload Pitch Deck
+              Upload CV/Resume
             </Label>
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-purple-400 transition-colors">
+            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-400 transition-colors">
               <input
                 id="file"
                 type="file"
@@ -229,12 +238,12 @@ Avoid: B2C, pre-revenue`)}
               {uploadMutation.isPending ? (
                 <>
                   <Loader2 className="mr-2 size-4 animate-spin" />
-                  Analyzing deck...
+                  Analyzing CV...
                 </>
               ) : (
                 <>
                   <Sparkles className="mr-2 size-4" />
-                  Analyze Contract With AI
+                  Analyze CV With AI
                 </>
               )}
             </Button>

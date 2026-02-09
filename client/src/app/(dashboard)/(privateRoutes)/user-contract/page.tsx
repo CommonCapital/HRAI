@@ -1,5 +1,6 @@
 
-import UserContracts from "@/components/dashboard/user-contracts";
+import UserCVAnalyses from "@/components/dashboard/user-contracts";
+
 import ErrorPage from "@/components/ErrorPage";
 import LoadingPage from "@/components/LoadingPage";
 
@@ -24,7 +25,7 @@ export default async function Dashboard() {
 
     const queryClient = getQueryClient();
     void queryClient.prefetchQuery(
-        trpc.contracts.getUserContracts.queryOptions()
+        trpc.candidates.getUserCVAnalyses.queryOptions()
 );
 
   return (
@@ -33,7 +34,7 @@ export default async function Dashboard() {
         <HydrationBoundary state={dehydrate(queryClient)}>
             <Suspense fallback={<LoadingPage />}>
                 <ErrorBoundary fallback={<ErrorPage />}>
-                  <UserContracts />
+                  <UserCVAnalyses />
             </ErrorBoundary> 
                    
                

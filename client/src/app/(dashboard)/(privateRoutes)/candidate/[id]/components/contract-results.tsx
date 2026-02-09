@@ -1,7 +1,7 @@
 'use client'
-import ContractAnalysisResults from "@/components/analysis/Pitch-deck-analysis-results";
 
-import { ContractAnalysis } from "@/lib/contract.interface";
+
+
 
 import { notFound } from "next/navigation";
 import {  useState } from "react";
@@ -10,6 +10,7 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { authClient } from "@/lib/auth-client";
 import { useTRPC } from "@/trpc/client";
 import LoadingPage from "@/components/LoadingPage";
+import CVAnalysisResults from "@/components/analysis/cv-analysis-results";
 
 interface IContractResultsProps {
   contractId: string;
@@ -23,7 +24,7 @@ const trpc = useTRPC()
   const { data: session, isPending, error, refetch } = authClient.useSession();
 const user = session?.user;
  const { data: contract } = useSuspenseQuery(
-    trpc.contracts.getContractById.queryOptions({ id: contractId })
+    trpc.candidates.getCVAnalysisById.queryOptions({ id: contractId })
   );
 
   if (!contract) {
@@ -41,8 +42,8 @@ const user = session?.user;
   }
 
   return (
-    <ContractAnalysisResults
-      contractId={contractId}
+    <CVAnalysisResults
+      candidateId={contractId}
       analysisResults={contract}
       
       

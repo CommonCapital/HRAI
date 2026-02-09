@@ -2,7 +2,7 @@
 
 import ErrorPage from "@/components/ErrorPage";
 import LoadingPage from "@/components/LoadingPage";
-import ContractAnalysisResults from "@/components/analysis/Pitch-deck-analysis-results";
+import ContractAnalysisResults from "@/components/analysis/cv-analysis-results";
 import EmptyState from "@/components/analysis/empty";
 import { auth } from "@/lib/auth";
 
@@ -30,7 +30,7 @@ export default async function ContractResultsPage() {
 
     const queryClient = getQueryClient();
     void queryClient.prefetchQuery(
-       trpc.contracts.getUserContracts.queryOptions()
+       trpc.candidates.getUserCVAnalyses.queryOptions()
     )
   return (
     <>
