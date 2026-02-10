@@ -189,10 +189,11 @@ export default function HRAILanding() {
               </h1>
               
               <motion.p 
-                className="text-lg font-light leading-relaxed max-w-xl opacity-80"
+                className="text-lg font-light leading-relaxed max-w-xl opacity-80 mb-25"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 0.8 }}
                 transition={{ delay: 0.6 }}
+              
               >
                 Train custom AI agents on your hiring standards. They screen, interview, 
                 verify, and recommend—autonomously. No black boxes. No bias. Just structured 
@@ -201,29 +202,232 @@ export default function HRAILanding() {
             </motion.div>
 
             <motion.div 
-              className="flex gap-4"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.8 }}
-            >
-              <motion.button
-              onClick={() => router.push(`/waitlist`)}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="px-8 h-12 bg-primary text-white text-sm tracking-widest uppercase font-light border-2 border-primary hover:bg-white hover:text-primary transition-colors"
-              >
-                Get Started
-              </motion.button>
-              
-              <motion.button
-              onClick={() => router.push(`https://drive.google.com/file/d/1chBw97mGlFh_R3KiqnGA61NC8CVx8V_D/view?usp=drivesdk`)}
-                whileHover={{ scale: 1.05, backgroundColor: "#FF6A00", color: "#FFFFFF" }}
-                whileTap={{ scale: 0.95 }}
-                className="px-8 h-12 border-2 border-primary text-primary text-sm tracking-widest uppercase font-light hover:bg-primary hover:text-white transition-all"
-              >
-                Watch Demo
-              </motion.button>
-            </motion.div>
+        className="flex gap-4"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.8 }}
+      >
+        <motion.button
+          onClick={() => router.push("/waitlist")}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          className="px-8 h-12 bg-[#FF6A00] text-white text-sm tracking-widest uppercase font-light border-2 border-black hover:bg-white hover:text-[#FF6A00] transition-colors"
+        >
+          Get Started
+        </motion.button>
+        
+        {/* Watch Demo Button with Arrows */}
+        <div className="relative">
+          <motion.button
+            onClick={() => window.open("https://drive.google.com/file/d/1chBw97mGlFh_R3KiqnGA61NC8CVx8V_D/view?usp=drivesdk", "_blank")}
+            whileHover={{ scale: 1.05, backgroundColor: "#FF6A00", color: "#FFFFFF" }}
+            whileTap={{ scale: 0.95 }}
+            className="px-8 h-12 border-2 border-[#FF6A00] text-[#FF6A00] text-sm tracking-widest uppercase font-light hover:bg-[#FF6A00] hover:text-white transition-all relative z-10"
+          >
+            Watch Demo
+          </motion.button>
+
+          {/* Arrow 1 - Top Left */}
+          <motion.svg
+            initial={{ opacity: 0, scale: 0, rotate: -10 }}
+            animate={{ opacity: 1, scale: 1, rotate: 0 }}
+            transition={{ delay: 1.2, duration: 0.5, type: "spring" }}
+            className="absolute -top-16 -left-12 w-24 h-24 pointer-events-none"
+            viewBox="0 0 100 100"
+            fill="none"
+          >
+            <motion.path
+              d="M 20 10 Q 30 25, 45 40 Q 50 45, 55 50"
+              stroke="#FF6A00"
+              strokeWidth="3"
+              strokeLinecap="round"
+              fill="none"
+              initial={{ pathLength: 0 }}
+              animate={{ pathLength: 1 }}
+              transition={{ delay: 1.2, duration: 0.8 }}
+            />
+            <motion.path
+              d="M 55 50 L 45 45 M 55 50 L 50 60"
+              stroke="#FF6A00"
+              strokeWidth="3"
+              strokeLinecap="round"
+              initial={{ pathLength: 0 }}
+              animate={{ pathLength: 1 }}
+              transition={{ delay: 1.8, duration: 0.3 }}
+            />
+          </motion.svg>
+
+          {/* Arrow 2 - Top Right */}
+          <motion.svg
+            initial={{ opacity: 0, scale: 0, rotate: 10 }}
+            animate={{ opacity: 1, scale: 1, rotate: 0 }}
+            transition={{ delay: 1.4, duration: 0.5, type: "spring" }}
+            className="absolute -top-20 -right-16 w-28 h-28 pointer-events-none"
+            viewBox="0 0 100 100"
+            fill="none"
+          >
+            <motion.path
+              d="M 80 15 Q 70 28, 58 42 Q 52 48, 48 52"
+              stroke="#FF6A00"
+              strokeWidth="3"
+              strokeLinecap="round"
+              fill="none"
+              initial={{ pathLength: 0 }}
+              animate={{ pathLength: 1 }}
+              transition={{ delay: 1.4, duration: 0.8 }}
+            />
+            <motion.path
+              d="M 48 52 L 58 48 M 48 52 L 52 62"
+              stroke="#FF6A00"
+              strokeWidth="3"
+              strokeLinecap="round"
+              initial={{ pathLength: 0 }}
+              animate={{ pathLength: 1 }}
+              transition={{ delay: 2.0, duration: 0.3 }}
+            />
+          </motion.svg>
+
+          {/* Arrow 3 - Bottom Left */}
+          <motion.svg
+            initial={{ opacity: 0, scale: 0, rotate: 15 }}
+            animate={{ opacity: 1, scale: 1, rotate: 0 }}
+            transition={{ delay: 1.6, duration: 0.5, type: "spring" }}
+            className="absolute -bottom-14 -left-16 w-32 h-32 pointer-events-none"
+            viewBox="0 0 100 100"
+            fill="none"
+          >
+            <motion.path
+              d="M 15 85 Q 25 70, 38 58 Q 44 52, 50 48"
+              stroke="#FF6A00"
+              strokeWidth="3"
+              strokeLinecap="round"
+              fill="none"
+              initial={{ pathLength: 0 }}
+              animate={{ pathLength: 1 }}
+              transition={{ delay: 1.6, duration: 0.8 }}
+            />
+            <motion.path
+              d="M 50 48 L 42 52 M 50 48 L 46 38"
+              stroke="#FF6A00"
+              strokeWidth="3"
+              strokeLinecap="round"
+              initial={{ pathLength: 0 }}
+              animate={{ pathLength: 1 }}
+              transition={{ delay: 2.2, duration: 0.3 }}
+            />
+          </motion.svg>
+
+          {/* Arrow 4 - Right Side */}
+          <motion.svg
+            initial={{ opacity: 0, scale: 0, rotate: -15 }}
+            animate={{ opacity: 1, scale: 1, rotate: 0 }}
+            transition={{ delay: 1.3, duration: 0.5, type: "spring" }}
+            className="absolute top-0 -right-24 w-24 h-24 pointer-events-none"
+            viewBox="0 0 100 100"
+            fill="none"
+          >
+            <motion.path
+              d="M 85 50 Q 72 50, 60 50"
+              stroke="#FF6A00"
+              strokeWidth="3"
+              strokeLinecap="round"
+              fill="none"
+              initial={{ pathLength: 0 }}
+              animate={{ pathLength: 1 }}
+              transition={{ delay: 1.3, duration: 0.6 }}
+            />
+            <motion.path
+              d="M 60 50 L 68 45 M 60 50 L 68 55"
+              stroke="#FF6A00"
+              strokeWidth="3"
+              strokeLinecap="round"
+              initial={{ pathLength: 0 }}
+              animate={{ pathLength: 1 }}
+              transition={{ delay: 1.7, duration: 0.3 }}
+            />
+          </motion.svg>
+
+          {/* Arrow 5 - Bottom Right */}
+          <motion.svg
+            initial={{ opacity: 0, scale: 0, rotate: -20 }}
+            animate={{ opacity: 1, scale: 1, rotate: 0 }}
+            transition={{ delay: 1.5, duration: 0.5, type: "spring" }}
+            className="absolute -bottom-16 -right-20 w-32 h-32 pointer-events-none"
+            viewBox="0 0 100 100"
+            fill="none"
+          >
+            <motion.path
+              d="M 85 88 Q 72 72, 60 60 Q 55 55, 52 52"
+              stroke="#FF6A00"
+              strokeWidth="3"
+              strokeLinecap="round"
+              fill="none"
+              initial={{ pathLength: 0 }}
+              animate={{ pathLength: 1 }}
+              transition={{ delay: 1.5, duration: 0.8 }}
+            />
+            <motion.path
+              d="M 52 52 L 60 56 M 52 52 L 56 42"
+              stroke="#FF6A00"
+              strokeWidth="3"
+              strokeLinecap="round"
+              initial={{ pathLength: 0 }}
+              animate={{ pathLength: 1 }}
+              transition={{ delay: 2.1, duration: 0.3 }}
+            />
+          </motion.svg>
+
+          {/* Handwritten Text Labels */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 2.3, duration: 0.4 }}
+            className="absolute -top-24 left-1/2 -translate-x-1/2 pointer-events-none"
+          >
+            <span className="text-[#FF6A00] font-bold text-lg rotate-[-8deg] inline-block whitespace-nowrap" style={{ fontFamily: 'Comic Sans MS, cursive' }}>
+              MUST WATCH! →
+            </span>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 2.5, duration: 0.4 }}
+            className="absolute -bottom-20 -left-24 pointer-events-none"
+          >
+            <span className="text-[#FF6A00] font-bold text-base rotate-[12deg] inline-block whitespace-nowrap" style={{ fontFamily: 'Comic Sans MS, cursive' }}>
+              Check this out!
+            </span>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 2.4, duration: 0.4 }}
+            className="absolute top-0 -right-32 pointer-events-none"
+          >
+            <span className="text-[#FF6A00] font-bold text-base rotate-[-5deg] inline-block whitespace-nowrap" style={{ fontFamily: 'Comic Sans MS, cursive' }}>
+              ← See it live
+            </span>
+          </motion.div>
+
+          {/* Pulse Effect Behind Button */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ 
+              opacity: [0.3, 0.5, 0.3],
+              scale: [1, 1.1, 1]
+            }}
+            transition={{ 
+              delay: 2.6,
+              duration: 2,
+              repeat: Infinity,
+              ease: "easeInOut"
+            }}
+            className="absolute inset-0 bg-[#FF6A00] rounded blur-xl -z-10"
+          />
+        </div>
+      </motion.div>
 
             {/* Live Stats */}
             <motion.div 
@@ -614,7 +818,7 @@ export default function HRAILanding() {
               onClick={() => router.push(`/waitlist`)}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className="px-12 h-14 bg-white text-white text-sm tracking-widest uppercase font-light border-2 border-primary hover:bg-orange-400 hover:text-black transition-colors"
+                className="px-12 h-14 bg-white text-white text-sm tracking-widest uppercase font-light border-2 border-orange-400 hover:bg-orange-400 hover:text-black transition-colors"
               >
                 Deploy Now (Waitlist)
               </motion.button>
