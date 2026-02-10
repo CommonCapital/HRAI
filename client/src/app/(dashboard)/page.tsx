@@ -216,6 +216,7 @@ export default function HRAILanding() {
               </motion.button>
               
               <motion.button
+              onClick={() => router.push(`https://drive.google.com/file/d/1chBw97mGlFh_R3KiqnGA61NC8CVx8V_D/view?usp=drivesdk`)}
                 whileHover={{ scale: 1.05, backgroundColor: "#FF6A00", color: "#FFFFFF" }}
                 whileTap={{ scale: 0.95 }}
                 className="px-8 h-12 border-2 border-primary text-primary text-sm tracking-widest uppercase font-light hover:bg-primary hover:text-white transition-all"
