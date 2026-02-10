@@ -207,12 +207,12 @@ export default function HRAILanding() {
               transition={{ delay: 0.8 }}
             >
               <motion.button
-              onClick={() => router.push(`/agents`)}
+              onClick={() => router.push(`/waitlist`)}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 className="px-8 h-12 bg-primary text-white text-sm tracking-widest uppercase font-light border-2 border-primary hover:bg-white hover:text-primary transition-colors"
               >
-                Deploy Agent
+                Get Started
               </motion.button>
               
               <motion.button
@@ -611,15 +611,16 @@ export default function HRAILanding() {
 
             <div className="flex gap-6 justify-center">
               <motion.button
-              onClick={() => router.push(`/agents`)}
+              onClick={() => router.push(`/waitlist`)}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className="px-12 h-14 bg-primary text-white text-sm tracking-widest uppercase font-light border-2 border-primary hover:bg-white hover:text-primary transition-colors"
+                className="px-12 h-14 bg-white text-white text-sm tracking-widest uppercase font-light border-2 border-primary hover:bg-orange-400 hover:text-black transition-colors"
               >
-                Deploy Now
+                Deploy Now (Waitlist)
               </motion.button>
               
               <motion.button
+              onClick={() => router.push(`/book-demo`)}
                 whileHover={{ scale: 1.05, backgroundColor: "#FF6A00", color: "#FFFFFF" }}
                 whileTap={{ scale: 0.95 }}
                 className="px-12 h-14 border-2 border-primary text-primary text-sm tracking-widest uppercase font-light transition-all"

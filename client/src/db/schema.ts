@@ -332,8 +332,48 @@ export const jobCriteria = pgTable("job_criteria", {
     .$onUpdate(() => new Date()),
 });
 
+// Demo Bookings Status Enum
+export const demoStatusEnum = pgEnum("demo_status", [
+  "pending",
+  "contacted",
+  "scheduled",
+  "completed",
+  "cancelled",
+]);
+
+// Demo Bookings table - stores demo requests
+export const demoBookings = pgTable("demo_bookings", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => nanoid()),
+  name: text("name").notNull(),
+  email: text("email").notNull(),
+  company: text("company"),
+  jobTitle: text("job_title"),
+  phoneNumber: text("phone_number"),
+  companySize: text("company_size"), // "1-10", "11-50", "51-200", "201-500", "500+"
+  message: text("message"),
+  status: demoStatusEnum("status").notNull().default("pending"),
+  preferredDate: timestamp("preferred_date"),
+  scheduledDate: timestamp("scheduled_date"),
+  notes: text("notes"), // Internal notes from sales team
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  referralSource: text("referral_source"), // "website", "linkedin", "google", "referral", etc.
+  utmSource: text("utm_source"),
+  utmMedium: text("utm_medium"),
+  utmCampaign: text("utm_campaign"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at")
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date()),
+});
+
 // Type exports
 export type CVAnalysis = typeof cvAnalysis.$inferSelect;
 export type NewCVAnalysis = typeof cvAnalysis.$inferInsert;
 export type JobCriteria = typeof jobCriteria.$inferSelect;
 export type NewJobCriteria = typeof jobCriteria.$inferInsert;
+export type DemoBooking = typeof demoBookings.$inferSelect;
+export type NewDemoBooking = typeof demoBookings.$inferInsert;
