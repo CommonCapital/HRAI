@@ -127,8 +127,8 @@ export function UploadModal({
           </DialogTitle>
           <DialogDescription>
             {uploadMutation.isPending 
-              ? "Analyzing the CV with AI... This may take 30-60 seconds."
-              : "Upload a CV/resume and optionally specify your job requirements"
+              ? "Analyzing the CV with AI... This may take 30-60 seconds. Please ensure the resume image is clearly visible; otherwise, the provided information may be inconsistent."
+              : "Upload a CV/resume and optionally specify your job requirements. Please ensure the resume image is clearly visible; otherwise, the provided information may be inconsistent."
             }
           </DialogDescription>
         </DialogHeader>

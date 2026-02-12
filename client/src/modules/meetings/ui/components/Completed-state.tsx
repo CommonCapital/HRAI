@@ -59,7 +59,7 @@ export const CompletedState = ({ data }: Props) => {
                 <BookOpenTextIcon className="w-5 h-5" />
                 <span className="hidden xs:inline">Report</span>
               </TabsTrigger>
-
+ 
               {/* VIDEO TAB */}
               <TabsTrigger
                 value="recording"
@@ -99,7 +99,7 @@ export const CompletedState = ({ data }: Props) => {
               <ChatProvider meetingId={data.id} meetingName={data.name} />
             </div>
           </TabsContent>
-
+  
           <TabsContent value="recording" className="mt-0">
             <div className="bg-white rounded border border-[rgba(255,106,0,0.1)] overflow-hidden">
               <div className="relative pt-[56.25%] h-0">

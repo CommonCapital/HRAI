@@ -369,7 +369,12 @@ export const demoBookings = pgTable("demo_bookings", {
     .defaultNow()
     .$onUpdate(() => new Date()),
 });
-
+// Add to your schema
+export const processedWebhooks = pgTable("processed_webhooks", {
+  webhookId: text("webhook_id").primaryKey(),
+  eventType: text("event_type").notNull(),
+  processedAt: timestamp("processed_at").defaultNow().notNull(),
+});
 // Type exports
 export type CVAnalysis = typeof cvAnalysis.$inferSelect;
 export type NewCVAnalysis = typeof cvAnalysis.$inferInsert;

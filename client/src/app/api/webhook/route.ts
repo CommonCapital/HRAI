@@ -10,7 +10,7 @@ import { GeneratdAvatarUri } from "@/lib/avatar";
 import {and, eq, not} from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { agents, meetings } from "@/db/schema";
+import { agents, meetings, processedWebhooks } from "@/db/schema";
 import {streamVideo} from "@/lib/stream-video";
 import { inngest } from "@/inngest/client";
 import OpenAI from "openai";
@@ -152,103 +152,113 @@ if (eventType === "call.session_started") {
             return NextResponse.json({error: "Missing meetingID"}, {status: 400});
         }
 
-    } else if (eventType === "call.session_ended") {
-        const event = payload as CallEndedEvent;
-        const meetingId = event.call.custom?.meetingId;
+    // WEBHOOK HANDLER FIX - Replace your current "call.session_ended" handler
 
-        if (!meetingId) {
-            return NextResponse.json({error: "Missing meetingId"}, {status: 400});
-        }
+} else if (eventType === "call.session_ended") {
+    const event = payload as CallEndedEvent;
+    const meetingId = event.call.custom?.meetingId;
 
-        // 🔥 GET TRANSCRIPT FROM FASTAPI BEFORE STOPPING
-        // 🔥 GET TRANSCRIPT FROM FASTAPI BEFORE STOPPING
-let transcriptData: any = null;
-// ❌ DELETE THIS LINE:
-// let formattedTranscript = "";
-
-try {
-    console.log(`📝 Fetching transcript from FastAPI for meeting: ${meetingId}`);
-    
-    const transcriptResponse = await fetch(
-        `${FASTAPI_URL}/meetings/${meetingId}/transcript`,
-        { method: 'GET' }
-    );
-
-    if (transcriptResponse.ok) {
-        transcriptData = await transcriptResponse.json();
-        console.log(`✅ Retrieved ${transcriptData.total_entries} transcript entries from FastAPI`);
-        
-        // ❌ DELETE THESE LINES:
-        // formattedTranscript = transcriptData.transcript
-        //     .map((entry: any) => `[${entry.speaker}]: ${entry.text}`)
-        //     .join('\n');
-        // console.log(`✅ Formatted transcript (${formattedTranscript.length} characters)`);
-    } else {
-        console.warn(`⚠️ Failed to fetch transcript from FastAPI`);
+    if (!meetingId) {
+        return NextResponse.json({error: "Missing meetingId"}, {status: 400});
     }
-} catch (error) {
-    console.error('❌ Error fetching transcript from FastAPI:', error);
-}
 
-        // 🔥 STOP THE AI AGENT
-        try {
-            console.log(`🛑 Stopping AI agent for meeting: ${meetingId}`);
+    // 🔥 GET TRANSCRIPT FROM FASTAPI BEFORE STOPPING
+    let transcriptData: any = null;
+    let transformedTranscript: any[] = [];
+
+    try {
+        console.log(`📝 Fetching transcript from FastAPI for meeting: ${meetingId}`);
+        
+        const transcriptResponse = await fetch(
+            `${FASTAPI_URL}/meetings/${meetingId}/transcript`,
+            { method: 'GET' }
+        );
+
+        if (transcriptResponse.ok) {
+            transcriptData = await transcriptResponse.json();
+            console.log(`✅ Retrieved ${transcriptData.total_entries} transcript entries from FastAPI`);
             
-            const response = await fetch(`${FASTAPI_URL}/meetings/${meetingId}/stop`, {
-                method: 'POST',
+            // ✅ TRANSFORM to match UI expectations (StreamTranscriptItem format)
+            transformedTranscript = transcriptData.transcript.map((entry: any, index: number) => {
+                const timestamp = new Date(entry.timestamp);
+                const startMs = timestamp.getTime();
+                
+                return {
+                    speaker_id: entry.speaker,           // ✅ Rename "speaker" to "speaker_id"
+                    text: entry.text,
+                    start_ts: startMs,                   // ✅ Convert ISO timestamp to milliseconds
+                    end_ts: startMs + 1000,              // Estimate 1 second duration
+                    type: entry.type || 'user'
+                };
             });
-
-            if (response.ok) {
-                const data = await response.json();
-                console.log(`✅ AI agent stopped:`, data);
-            } else {
-                console.warn('⚠️ Failed to stop AI agent, it may have already stopped');
-            }
-        } catch (error) {
-            console.error('❌ Error stopping AI agent:', error);
-        }
-
-        // 🔥 UPDATE DATABASE WITH TRANSCRIPT
-       // 🔥 UPDATE DATABASE WITH TRANSCRIPT DATA (as JSON string)
-await db.update(meetings).set({
-    status: "processing", 
-    endedAt: new Date(),
-    transcriptUrl: transcriptData ? JSON.stringify(transcriptData.transcript) : null  // ✅ Store as JSON
-}).where(
-    and(
-        eq(meetings.id, meetingId), 
-        eq(meetings.status, "active")
-    )
-);
-        console.log("✅ Meeting status updated to processing");
-
-        // 🔥 SEND TO INNGEST WITH TRANSCRIPT DATA
-        try {
-            console.log("🔁 Sending to Inngest with transcript data...");
             
-            await inngest.send({
-                name: "meetings/processing",
-                data: {
-                    meetingId: meetingId,
-                    transcript: transcriptData?.transcript || [],
-                    transcriptText: JSON.stringify(transcriptData.transcript),
-                    transcriptEntries: transcriptData?.total_entries || 0
-                },
-            }); 
-            
-            console.log("✅ Inngest function triggered successfully with transcript");
-        } catch (error) {
-            console.error("❌ Failed to trigger Inngest function:", error);
+            console.log(`✅ Transformed ${transformedTranscript.length} transcript entries`);
+        } else {
+            console.warn(`⚠️ Failed to fetch transcript from FastAPI`);
         }
+    } catch (error) {
+        console.error('❌ Error fetching transcript from FastAPI:', error);
+    }
 
-    } else if (eventType === "call.transcription_ready") {
+    // 🔥 STOP THE AI AGENT
+    try {
+        console.log(`🛑 Stopping AI agent for meeting: ${meetingId}`);
+        
+        const response = await fetch(`${FASTAPI_URL}/meetings/${meetingId}/stop`, {
+            method: 'POST',
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            console.log(`✅ AI agent stopped:`, data);
+        } else {
+            console.warn('⚠️ Failed to stop AI agent, it may have already stopped');
+        }
+    } catch (error) {
+        console.error('❌ Error stopping AI agent:', error);
+    }
+
+    // 🔥 UPDATE DATABASE WITH TRANSFORMED TRANSCRIPT
+    await db.update(meetings).set({
+        status: "processing", 
+        endedAt: new Date(),
+        transcriptUrl: transformedTranscript.length > 0 
+            ? JSON.stringify(transformedTranscript)  // ✅ Store TRANSFORMED format
+            : null
+    }).where(
+        and(
+            eq(meetings.id, meetingId), 
+            eq(meetings.status, "active")
+        )
+    );
+    console.log("✅ Meeting status updated to processing with transformed transcript");
+
+    // 🔥 SEND TO INNGEST WITH TRANSFORMED TRANSCRIPT
+    try {
+        console.log("🔁 Sending to Inngest with transformed transcript data...");
+        
+        await inngest.send({
+            name: "meetings/processing",
+            data: {
+                meetingId: meetingId,
+                transcript: transformedTranscript,  // ✅ Use transformed format
+                transcriptText: JSON.stringify(transformedTranscript),
+                transcriptEntries: transformedTranscript.length
+            },
+        }); 
+        
+        console.log("✅ Inngest function triggered successfully with transformed transcript");
+    } catch (error) {
+        console.error("❌ Failed to trigger Inngest function:", error);
+    }
+} else if (eventType === "call.transcription_ready") {
         console.log("📝 Stream transcription is ready (may be empty if using Gemini)");
         const event = payload as CallTranscriptionReadyEvent;
         const meetingId = event.call_cid.split(":")[1];
 
         // This event still fires but Stream's transcript will be empty
         // We're using Gemini's transcript instead
-        console.log("Stream transcript URL:", event.call_transcription.url);
+        console.log("Stream transcript URL:", event.call_transcription);
 
     } else if (eventType === "call.recording_ready") {
         const event = payload as CallRecordingReadyEvent;
@@ -266,7 +276,7 @@ await db.update(meetings).set({
         const userId = event.user?.id;
         const channelId = event.channel_id;
         const text = event.message?.text;
-
+ const messageId = event.message?.id;
         if (!userId || !channelId || !text) {
             return NextResponse.json(
                 {error: "Missing userId, channelId or text"},
@@ -292,6 +302,23 @@ await db.update(meetings).set({
         if (!existingAgent) {
             return NextResponse.json({error: "Agent not found"}, {status:404});
         }
+        if (!messageId) return NextResponse.json({status: "No message ID"});
+    
+    // ✅ CHECK: Have we processed this message already?
+    const [existing] = await db.select()
+        .from(processedWebhooks)
+        .where(eq(processedWebhooks.webhookId, messageId));
+    
+    if (existing) {
+        console.log(`⚠️ Duplicate webhook for message ${messageId} - ignoring`);
+        return NextResponse.json({status: "Already processed"});
+    }
+    
+    // ✅ MARK as processing IMMEDIATELY (atomic operation)
+    await db.insert(processedWebhooks).values({
+        webhookId: messageId,
+        eventType: "message.new",
+    });
 
         if (userId !== existingAgent.id) {
             const instructions = `

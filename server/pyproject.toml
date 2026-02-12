@@ -6,5 +6,6 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi==0.109.0",
+    "python-dotenv>=1.2.1",
     "vision-agents[deepgram,elevenlabs,gemini,getstream,huggingface,nvidia,openai,ultralytics]>=0.2.10",
 ]

@@ -347,8 +347,18 @@ EXTRACTION TARGETS:
 ✓ Achievements and metrics`;
 
   const userPrompt = `CV/RESUME TEXT:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📄 CV TEXT - READ COMPLETELY, EVERY WORD
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 ${cvText}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📋 JOB REQUIREMENTS - MUST EVALUATE AGAINST THESE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ${criteriaPrompt}
+
+⚠️ CRITICAL: Failure to evaluate against these requirements = SEVERE PENALTIES
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🔥🔥🔥 MANDATORY EXTRACTION CHECKLIST 🔥🔥🔥
@@ -623,7 +633,9 @@ NOW RESPOND WITH THIS JSON STRUCTURE (replace ALL example values with ACTUAL dat
   
   "recommendation": "Interview",
   "summary": "Strong backend engineer with 6 years experience in Python/Django. Meets most requirements but needs interview to validate cloud experience. Recommend proceeding with technical interview.",
-  "overallScore": 78
+  "overallScore": 78 ( The candidate score is computed as follows: 
+Score=(roleScore×10×0.4)+(experienceScore×10×0.4)+(completeness×0.2)
+It is not predetermined (e.g., 78); if the formula produces no value, the score defaults to 50. )
 }
 
 ⚠️⚠️⚠️ CRITICAL: The JSON above shows EXAMPLE DATA only! ⚠️⚠️⚠️
@@ -842,11 +854,18 @@ EXTRACT AND USE REAL DATA FOR EVERY FIELD!
       else analysis.recommendation = "Pass";
     }
     
-    if (!analysis.overallScore) {
-      const roleScore = analysis.roleAlignment?.score || 0;
-      const completeness = analysis.completenessScore || 0;
-      analysis.overallScore = Math.round((roleScore * 10 + completeness) / 2) || 50;
-    }
+   if (!analysis.overallScore) {
+  const roleScore = analysis.roleAlignment?.score || 0;
+  const experienceScore = analysis.experienceMatch?.score || 0;
+  const completeness = analysis.completenessScore || 0;
+  
+  // Weight: role alignment 40%, experience 40%, completeness 20%
+  analysis.overallScore = Math.round(
+    (roleScore * 10 * 0.4) + 
+    (experienceScore * 10 * 0.4) + 
+    (completeness * 0.2)
+  ) || 50;
+}
     
     if (!analysis.summary) {
       analysis.summary = `${analysis.recommendation} - See detailed analysis`;

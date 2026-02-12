@@ -230,7 +230,7 @@ const trpc = useTRPC()
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <AlertDialog>
+              <AlertDialog >
                 <AlertDialogTrigger asChild>
                   <DropdownMenuItem onSelect={(e: any) => e.preventDefault()}>
                     <span className="text-destructive">Delete Analysis</span>

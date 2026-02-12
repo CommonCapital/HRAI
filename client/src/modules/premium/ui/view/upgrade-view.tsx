@@ -6,12 +6,12 @@ import { authClient } from "@/lib/auth-client"
 import { PricingCard } from "../components/pricing-card"
 export const UpgradeView = () => {
     const trpc = useTRPC();
-    const {data: products} = useSuspenseQuery(
-        trpc.premium.getProducts.queryOptions(),
-    );
-    const {data: currentSubscription} = useSuspenseQuery(
-        trpc.premium.getCurrentSubscription.queryOptions(),
-    );
+   // const {data: products} = useSuspenseQuery(
+   //     trpc.premium.getProducts.queryOptions(),
+   // );
+   // const {data: currentSubscription} = useSuspenseQuery(
+  //      trpc.premium.getCurrentSubscription.queryOptions(),
+  //  );
 
   return (
     <div>
