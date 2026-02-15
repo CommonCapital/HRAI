@@ -1,6 +1,6 @@
 'use client'
-import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -12,10 +12,12 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Loader2, Upload, Sparkles } from "lucide-react";
+import { Loader2, Upload, Sparkles, UserCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { useTRPC } from "@/trpc/client";
+import { CommandSelect } from "@/components/command-select";
+import { GeneratedAvatar } from "@/components/generated-avatar";
 
 interface UploadModalProps {
   isOpen: boolean;
@@ -30,10 +32,32 @@ export function UploadModal({
 }: UploadModalProps) {
   const [file, setFile] = useState<File | null>(null);
   const [criteriaText, setCriteriaText] = useState("");
+  const [selectedAgentId, setSelectedAgentId] = useState<string>("");
+  const [agentSearch, setAgentSearch] = useState("");
+  const [criteriaSource, setCriteriaSource] = useState<"manual" | "agent" | null>(null);
   
   const queryClient = useQueryClient();
   const router = useRouter();
   const trpc = useTRPC();
+  
+  // Fetch agents for selection
+  const agents = useQuery(
+    trpc.agents.getMany.queryOptions({
+      pageSize: 100,
+      search: agentSearch,
+    }),
+  );
+  
+  // Auto-fill criteria when agent is selected
+  useEffect(() => {
+    if (selectedAgentId && agents.data?.items) {
+      const selectedAgent = agents.data.items.find(a => a.id === selectedAgentId);
+      if (selectedAgent?.instructions) {
+        setCriteriaText(selectedAgent.instructions);
+        setCriteriaSource("agent");
+      }
+    }
+  }, [selectedAgentId, agents.data?.items]);
   
   /* ✅ BACKEND: candidates.analyzeCV mutation
    * Input: { file: { buffer, originalname, size }, criteriaText?, cvSource? }
@@ -109,6 +133,9 @@ export function UploadModal({
   const handleClose = () => {
     setFile(null);
     setCriteriaText("");
+    setSelectedAgentId("");
+    setAgentSearch("");
+    setCriteriaSource(null);
     onClose();
   };
 
@@ -119,10 +146,10 @@ export function UploadModal({
         handleClose();
       }
     }}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto bg-white">
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto bg-amber-100">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-2xl">
-            <Sparkles className="size-6 text-amber-500" />
+            <Sparkles className="size-6 text-blue-600" />
             Analyze CV/Resume
           </DialogTitle>
           <DialogDescription>
@@ -134,6 +161,51 @@ export function UploadModal({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6 mt-4">
+          {/* Agent Selection */}
+          <div className="space-y-2">
+            <Label className="text-sm font-semibold flex items-center gap-2">
+              <UserCircle2 className="size-4" />
+              Select Agent (Optional)
+            </Label>
+            <CommandSelect
+              options={(agents.data?.items ?? []).map((agent) => ({
+                id: agent.id,
+                value: agent.id,
+                children: (
+                  <div className="flex items-center gap-2">
+                    <GeneratedAvatar
+                      seed={agent.name}
+                      variant="initials"
+                      className="border-2 border-primary/20 size-6"
+                    />
+                    <div className="flex flex-col">
+                      <span className="font-medium text-sm">{agent.name}</span>
+                      {agent.instructions && (
+                        <span className="text-xs text-gray-500 truncate max-w-[300px]">
+                          {agent.instructions.substring(0, 60)}...
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ),
+              }))}
+              onSelect={(value) => {
+                setSelectedAgentId(value);
+              }}
+              onSearch={setAgentSearch}
+              value={selectedAgentId}
+              placeholder="Choose an agent to auto-fill requirements"
+            />
+            {selectedAgentId && criteriaSource === "agent" && (
+              <p className="text-xs text-green-600 flex items-center gap-1">
+                ✓ Job requirements auto-filled from agent. You can still edit below.
+              </p>
+            )}
+            <p className="text-xs text-gray-500">
+              💡 Select an agent to automatically use their job requirements, or write your own below.
+            </p>
+          </div>
+
           {/* Job Criteria Text Area */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
@@ -141,15 +213,34 @@ export function UploadModal({
                 Job Requirements (Optional)
               </Label>
               <div className="flex gap-1">
+                {selectedAgentId && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setSelectedAgentId("");
+                      setCriteriaText("");
+                      setCriteriaSource(null);
+                    }}
+                    className="text-xs h-7 text-red-600 hover:text-red-700"
+                  >
+                    Clear Agent
+                  </Button>
+                )}
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => setCriteriaText(`Senior Backend Engineer
+                  onClick={() => {
+                    setCriteriaText(`Senior Backend Engineer
 Required: Python, Django, PostgreSQL, 5+ years
 Preferred: AWS, Docker, Kubernetes
 Must have: Team leadership, system design
-Avoid: No production experience`)}
+Avoid: No production experience`);
+                    setSelectedAgentId("");
+                    setCriteriaSource("manual");
+                  }}
                   className="text-xs h-7"
                 >
                   Backend Eng
@@ -158,11 +249,15 @@ Avoid: No production experience`)}
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => setCriteriaText(`Full Stack Developer, 3-5 years
+                  onClick={() => {
+                    setCriteriaText(`Full Stack Developer, 3-5 years
 Required: React, Node.js, TypeScript
 Preferred: Next.js, tRPC, Tailwind
 Remote OK, $120k-$150k
-Must have: Portfolio, GitHub`)}
+Must have: Portfolio, GitHub`);
+                    setSelectedAgentId("");
+                    setCriteriaSource("manual");
+                  }}
                   className="text-xs h-7"
                 >
                   Full Stack
@@ -173,11 +268,19 @@ Must have: Portfolio, GitHub`)}
               id="criteria"
               placeholder="Example: Senior Backend Engineer, 5+ years Python/Django, AWS experience required, team leadership preferred. $150k-$180k range."
               value={criteriaText}
-              onChange={(e: any) => setCriteriaText(e.target.value)}
+              onChange={(e: any) => {
+                setCriteriaText(e.target.value);
+                // If user manually edits after agent selection, mark as manual
+                if (e.target.value !== criteriaText && criteriaSource === "agent") {
+                  setCriteriaSource("manual");
+                }
+              }}
               className="min-h-[120px] resize-none font-mono text-sm"
             />
             <p className="text-xs text-gray-500">
-              💡 Write naturally - AI understands various formats. Include required skills, experience level, and deal-breakers.
+              💡 {selectedAgentId && criteriaSource === "agent" 
+                ? "Agent requirements loaded. Feel free to edit or add more details." 
+                : "Write naturally - AI understands various formats. Include required skills, experience level, and deal-breakers."}
             </p>
           </div>
 

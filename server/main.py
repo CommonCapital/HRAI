@@ -217,13 +217,32 @@ async def run_agent(call_id: str, agent_name: str, instructions: str, agent_id: 
             Track agent responses for stall detection AND transcript accumulation
             """
             last_activity['time'] = time.time()
+            response_text = None
             if hasattr(event, 'delta') and event.delta:
                 logger.debug(f"🤖 Agent: {event.delta[:50]}...")
+                response_text = event.delta
+            elif hasattr(event, 'text') and event.text:
+                logger.debug(f"🤖 Agent: {event.text[:50]}...")
+                response_text = event.text
+            elif hasattr(event, 'content') and event.content:
+                logger.debug(f"🤖 Agent: {event.content[:50]}...")
+                response_text = event.content
+            elif hasattr(event, 'chunk') and event.chunk:
+                logger.debug(f"🤖 Agent: {event.chunk[:50]}...")
+                response_text = event.chunk
+            if not response_text:
+                logger.warning(f"⚠️ LLMResponseChunkEvent attributes: {dir(event)}")
+                return
+
                 
                 # ✅ Accumulate agent response chunks
-                if not agent_response_buffer['start_time']:
-                    agent_response_buffer['start_time'] = datetime.now().isoformat()
-                agent_response_buffer['text'] += event.delta
+            if not agent_response_buffer['start_time']:
+                   agent_response_buffer['start_time'] = datetime.now().isoformat()
+            
+            agent_response_buffer['text'] += response_text
+
+            if len(agent_response_buffer['text']) % 50 == 0:
+                logger.info(f"🤖 Agent response length: {len(agent_response_buffer['text'])} chars")
         
         @agent.events.subscribe
         async def handle_session_ended(event: CallSessionEndedEvent):

@@ -273,7 +273,9 @@ export const cvAnalysis = pgTable("cv_analysis", {
   }>(),
   
   nextSteps: jsonb("next_steps").$type<string[]>(),
-  
+   // AI Chat messages storage
+ 
+messages: jsonb("messages").$type<any[]>(),
   recommendation: recommendationEnum("recommendation").notNull().default("Pass"),
   summary: text("summary").notNull(),
   overallScore: integer("overall_score").notNull(),

@@ -81,6 +81,11 @@ const firstSection = [
     href: "/",
   },
   {
+    icon: BotIcon,
+    label: "AI-Agents",
+    href: "/agents",
+  },
+  {
     icon: File,
     label: "CV-Analysis",
     href: "/user-contract",
@@ -90,11 +95,7 @@ const firstSection = [
     label: "Meetings",
     href: "/meetings",
   },
-  {
-    icon: BotIcon,
-    label: "AI-Agents",
-    href: "/agents",
-  },
+  
   {
     icon: User,
     label: "Attendees",

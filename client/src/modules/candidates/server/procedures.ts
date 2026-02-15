@@ -365,5 +365,53 @@ export const candidatesRouter = createTRPCRouter({
           cause: error,
         });
       }
+      
+    }),
+    // Save chat messages for CV analysis
+  saveMessages: protectedProcedure
+    .input(
+      z.object({
+        cvAnalysisId: z.string(),
+        messages: z.array(z.any()),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const analysis = await db
+          .select()
+          .from(cvAnalysis)
+          .where(eq(cvAnalysis.id, input.cvAnalysisId))
+          .limit(1)
+          .then(rows => rows[0]);
+
+        if (!analysis) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "CV analysis not found",
+          });
+        }
+
+        // Verify ownership
+        if (analysis.userId !== ctx.auth.user.id) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "You don't have permission to update this analysis",
+          });
+        }
+
+        await db
+          .update(cvAnalysis)
+          .set({ messages: input.messages })
+          .where(eq(cvAnalysis.id, input.cvAnalysisId));
+
+        return { success: true };
+      } catch (error) {
+        if (error instanceof TRPCError) throw error;
+        
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to save messages",
+        });
+      }
     }),
 });

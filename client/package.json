@@ -13,6 +13,8 @@
     "dev:webhook": "ngrok http --url=catfish-loyal-condor.ngrok-free.app 3000"
   },
   "dependencies": {
+    "@ai-sdk/openai": "^3.0.28",
+    "@ai-sdk/react": "^3.0.87",
     "@dicebear/collection": "^9.2.2",
     "@dicebear/core": "^9.2.2",
     "@hookform/resolvers": "^5.0.1",
@@ -56,6 +58,7 @@
     "@trpc/react-query": "^11.9.0",
     "@trpc/server": "^11.1.2",
     "@trpc/tanstack-react-query": "^11.1.2",
+    "ai": "^6.0.85",
     "better-auth": "^1.2.8",
     "bufferutil": "^4.0.9",
     "canvas": "^3.2.1",

@@ -177,7 +177,7 @@ if (eventType === "call.session_started") {
         if (transcriptResponse.ok) {
             transcriptData = await transcriptResponse.json();
             console.log(`✅ Retrieved ${transcriptData.total_entries} transcript entries from FastAPI`);
-            
+            console.log(`✅Transcript: ${transcriptData.transcript}`);
             // ✅ TRANSFORM to match UI expectations (StreamTranscriptItem format)
             transformedTranscript = transcriptData.transcript.map((entry: any, index: number) => {
                 const timestamp = new Date(entry.timestamp);
@@ -193,6 +193,7 @@ if (eventType === "call.session_started") {
             });
             
             console.log(`✅ Transformed ${transformedTranscript.length} transcript entries`);
+             console.log(`✅Transcript: ${transformedTranscript}`);
         } else {
             console.warn(`⚠️ Failed to fetch transcript from FastAPI`);
         }

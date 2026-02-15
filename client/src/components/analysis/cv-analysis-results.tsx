@@ -19,7 +19,9 @@ import {
   Briefcase,
   GraduationCap,
   Award,
-  Users
+  Users,
+  MessageCircle,
+  X
 } from "lucide-react";
 import OverallScoreChart from "./chart";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
@@ -28,6 +30,8 @@ import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Accordion, AccordionItem, AccordionTrigger } from "../ui/accordion";
 import { AccordionContent } from "@radix-ui/react-accordion";
+import CVAIChat from "../dashboard/AIChat";
+import { cn } from "@/lib/utils";
 
 interface ICVAnalysisResultsProps {
   analysisResults: any;
@@ -36,8 +40,10 @@ interface ICVAnalysisResultsProps {
 
 export default function CVAnalysisResults({
   analysisResults,
+  candidateId,
 }: ICVAnalysisResultsProps) {
   const [activeTab, setActiveTab] = useState("overview");
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
   if (!analysisResults) {
     return <div>No results</div>;
@@ -923,6 +929,40 @@ export default function CVAnalysisResults({
           </CardContent>
         </Card>
       )}
+
+      {/* Chat Toggle Button */}
+      <Button
+        onClick={() => setIsChatOpen(!isChatOpen)}
+        className={cn(
+          'fixed bottom-6 right-6 z-40 h-14 w-14 rounded-full shadow-2xl transition-all duration-300',
+          'bg-amber-100',
+          'hover:scale-110 active:scale-95',
+          isChatOpen && 'rotate-90'
+        )}
+        aria-label="Toggle AI Chat"
+      >
+        {isChatOpen ? (
+          <X className='h-6 w-6 text-white' />
+        ) : (
+          <MessageCircle className='h-6 w-6 text-white' />
+        )}
+      </Button>
+
+      {/* Notification Badge (shows when chat is closed) */}
+      {!isChatOpen && (
+        <div className='fixed bottom-[88px] right-6 z-40 animate-bounce'>
+          <div className='bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center'>
+            AI
+          </div>
+        </div>
+      )}
+
+      {/* AI Chat Component */}
+      <CVAIChat 
+        cvAnalysisId={candidateId}
+        isExpanded={isChatOpen}
+        onClose={() => setIsChatOpen(false)}
+      />
     </div>
   );
 }
