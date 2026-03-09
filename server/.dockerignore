@@ -1,0 +1,109 @@
+# flyctl launch added from .gitignore
+# Python-generated files
+**/__pycache__
+**/*.py[oc]
+**/build
+**/dist
+**/wheels
+**/*.egg-info
+
+# Virtual environments
+**/.venv
+**/.env
+
+# flyctl launch added from .venv/.gitignore
+.venv/**/*
+
+# flyctl launch added from .venv/lib/python3.12/site-packages/.gitignore
+# Byte-compiled / optimized / DLL files
+.venv/lib/python3.12/site-packages/**/__pycache__
+.venv/lib/python3.12/site-packages/**/*.py[cod]
+.venv/lib/python3.12/site-packages/**/*$py.class
+.venv/lib/python3.12/site-packages/**/*.so
+.venv/lib/python3.12/site-packages/**/.cursor/*
+# Distribution / packaging
+.venv/lib/python3.12/site-packages/**/.Python
+.venv/lib/python3.12/site-packages/**/build
+.venv/lib/python3.12/site-packages/**/dist
+.venv/lib/python3.12/site-packages/**/downloads
+.venv/lib/python3.12/site-packages/**/develop-eggs
+.venv/lib/python3.12/site-packages/**/eggs
+.venv/lib/python3.12/site-packages/**/.eggs
+.venv/lib/python3.12/site-packages/**/lib64
+.venv/lib/python3.12/site-packages/**/parts
+.venv/lib/python3.12/site-packages/**/sdist
+.venv/lib/python3.12/site-packages/**/var
+.venv/lib/python3.12/site-packages/**/wheels
+.venv/lib/python3.12/site-packages/**/share/python-wheels
+.venv/lib/python3.12/site-packages/**/pip-wheel-metadata
+.venv/lib/python3.12/site-packages/**/MANIFEST
+.venv/lib/python3.12/site-packages/**/*.egg-info
+.venv/lib/python3.12/site-packages/**/*.egg
+
+# Installer logs
+.venv/lib/python3.12/site-packages/**/pip-log.txt
+.venv/lib/python3.12/site-packages/**/pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+.venv/lib/python3.12/site-packages/**/htmlcov
+.venv/lib/python3.12/site-packages/**/.tox
+.venv/lib/python3.12/site-packages/**/.nox
+.venv/lib/python3.12/site-packages/**/.coverage
+.venv/lib/python3.12/site-packages/**/.coverage.*
+.venv/lib/python3.12/site-packages/**/.cache
+.venv/lib/python3.12/site-packages/**/coverage.xml
+.venv/lib/python3.12/site-packages/**/nosetests.xml
+.venv/lib/python3.12/site-packages/**/*.cover
+.venv/lib/python3.12/site-packages/**/*.py,cover
+.venv/lib/python3.12/site-packages/**/.hypothesis
+.venv/lib/python3.12/site-packages/**/.pytest_cache
+
+# Type checker / lint caches
+.venv/lib/python3.12/site-packages/**/.mypy_cache
+.venv/lib/python3.12/site-packages/**/.dmypy.json
+.venv/lib/python3.12/site-packages/**/dmypy.json
+.venv/lib/python3.12/site-packages/**/.pytype
+.venv/lib/python3.12/site-packages/**/.pyre
+.venv/lib/python3.12/site-packages/**/.ruff_cache
+
+# Environments
+.venv/lib/python3.12/site-packages/**/.venv
+.venv/lib/python3.12/site-packages/**/env
+.venv/lib/python3.12/site-packages/**/venv
+.venv/lib/python3.12/site-packages/**/ENV
+.venv/lib/python3.12/site-packages/**/env.bak
+.venv/lib/python3.12/site-packages/**/venv.bak
+.venv/lib/python3.12/site-packages/**/.env
+.venv/lib/python3.12/site-packages/**/.env.local
+.venv/lib/python3.12/site-packages/**/.env.*.local
+.venv/lib/python3.12/site-packages/**/.env.bak
+.venv/lib/python3.12/site-packages/**/pyvenv.cfg
+.venv/lib/python3.12/site-packages/**/.python-version
+
+# Editors / IDEs
+.venv/lib/python3.12/site-packages/**/.vscode
+.venv/lib/python3.12/site-packages/**/.idea
+
+# Jupyter Notebook
+.venv/lib/python3.12/site-packages/**/.ipynb_checkpoints
+
+# OS / Misc
+.venv/lib/python3.12/site-packages/**/.DS_Store
+.venv/lib/python3.12/site-packages/**/*.log
+
+# Tooling & repo-specific
+.venv/lib/python3.12/site-packages/**/pyrightconfig.json
+.venv/lib/python3.12/site-packages/**/shell.nix
+.venv/lib/python3.12/site-packages/**/bin/*
+.venv/lib/python3.12/site-packages/**/lib/*
+.venv/lib/python3.12/site-packages/**/stream-py
+
+# Artifacts / assets
+.venv/lib/python3.12/site-packages/**/*.pt
+.venv/lib/python3.12/site-packages/**/*.kef
+.venv/lib/python3.12/site-packages/**/*.onnx
+.venv/lib/python3.12/site-packages/**/profile.html
+
+.venv/lib/python3.12/site-packages/opencode.json
+.venv/lib/python3.12/site-packages/**/.ralph-tui
+fly.toml
