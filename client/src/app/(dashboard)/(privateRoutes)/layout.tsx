@@ -25,7 +25,7 @@ const Layout = async ({children}:Props) => {
   session!.user.email !== "partners@musedata.ai" &&
   session!.user.email !== "nursanomarov616@gmail.com"
 ) {
-  redirect("/");
+  redirect("/waitlist");
 }
     
     return (
