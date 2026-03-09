@@ -11,7 +11,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { BotIcon, File, FileText, Home, LayoutDashboard, Settings, StarIcon, User, VideoIcon } from "lucide-react";
+import { BotIcon, Contact, File, FileText, FolderSync, FormInput, Home, LayoutDashboard, Settings, StarIcon, User, VideoIcon } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { Separator } from "@/components/ui/separator";
@@ -86,6 +86,11 @@ const firstSection = [
     href: "/agents",
   },
   {
+    icon: FolderSync,
+    label: "Applications",
+href: "/jobs"
+  },
+  {
     icon: File,
     label: "CV-Analysis",
     href: "/user-contract",
@@ -97,8 +102,8 @@ const firstSection = [
   },
   
   {
-    icon: User,
-    label: "Attendees",
+    icon: Contact,
+    label: "CRM-System",
     href: "/attendees",
   },
 ];

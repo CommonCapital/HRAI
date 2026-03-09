@@ -1,4 +1,3 @@
-
 import { boolean, text, timestamp, pgTable, pgEnum, jsonb, integer } from "drizzle-orm/pg-core";
 import { nanoid } from 'nanoid';
 
@@ -63,7 +62,7 @@ export const verification = pgTable("verification", {
     .$onUpdate(() => /* @__PURE__ */ new Date())
     .notNull(),
 });
-
+export const agentTypeEnum = pgEnum("agent_type", ["active", "passive"]);
 {/**Agents */}
 export const agents = pgTable("agents", {
   id: text("id")
@@ -73,6 +72,7 @@ export const agents = pgTable("agents", {
   userId: text("user_id")
   .notNull()
   .references(() => user.id, { onDelete: "cascade"}),
+  agentType: agentTypeEnum("agent_type").notNull().default("active"),
   instructions: text("instructions").notNull(),
   instructions2: text("instructions2").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -81,7 +81,6 @@ export const agents = pgTable("agents", {
 
 export const meetingStatus = pgEnum("meeting_status", [
   "upcoming",
-
   "active",
   "completed",
   "processing",
@@ -99,6 +98,9 @@ export const meetings = pgTable("meetings", {
   agentId: text("agent_id")
   .notNull()
   .references(() => agents.id, { onDelete: "cascade"}),
+  // ✅ NEW: Optional reference to a CV analysis for HR interview context
+  cvAnalysisId: text("cv_analysis_id")
+    .references(() => cvAnalysis.id, { onDelete: "set null" }),
   status: meetingStatus("status").notNull().default("upcoming"),
   startedAt: timestamp("started_at"),
   endedAt: timestamp("ended_at"),
@@ -371,16 +373,408 @@ export const demoBookings = pgTable("demo_bookings", {
     .defaultNow()
     .$onUpdate(() => new Date()),
 });
+
 // Add to your schema
 export const processedWebhooks = pgTable("processed_webhooks", {
   webhookId: text("webhook_id").primaryKey(),
   eventType: text("event_type").notNull(),
   processedAt: timestamp("processed_at").defaultNow().notNull(),
 });
-// Type exports
+
+export const employmentTypeEnum = pgEnum("employment_type", [
+  "full_time",
+  "part_time",
+  "contract",
+  "internship",
+  "temporary",
+]);
+
+export const workplaceTypeEnum = pgEnum("workplace_type", [
+  "on_site",
+  "remote",
+  "hybrid",
+]);
+
+export const applicationStatusEnum = pgEnum("application_status", [
+  "submitted",
+  "in_review",
+  "accepted",
+  "rejected",
+  "withdrawn",
+  "shortlisted"
+]);
+
+export const notificationTypeEnum = pgEnum("notification_type", [
+  "application_status",
+  "application_received",
+  "job_closed",
+  "system",
+]);
+
+export const companyMemberRoleEnum = pgEnum("company_member_role", [
+  "owner",
+  "admin",
+  "recruiter",
+  "member",
+]);
+
+// ─── Companies ────────────────────────────────────────────────────────────────
+// No clerkOrgId — owned by a user directly via createdByUserId.
+// companyMembers is kept for future multi-member support; for now only the
+// creator is inserted with role "owner".
+
+export const companies = pgTable("companies", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => nanoid()),
+  name: text("name").notNull(),
+  slug: text("slug").unique(),
+  logoUrl: text("logo_url"),
+  website: text("website"),
+  description: text("description"),
+  location: text("location"),
+  createdByUserId: text("created_by_user_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at")
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date()),
+});
+
+export const companyMembers = pgTable(
+  "company_members",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => nanoid()),
+    companyId: text("company_id")
+      
+      .references(() => companies.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    role: companyMemberRoleEnum("role").notNull().default("member"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at")
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+
+);
+
+// ─── Candidate Profiles ───────────────────────────────────────────────────────
+
+export const candidateProfiles = pgTable("candidate_profiles", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => nanoid()),
+  userId: text("user_id")
+    .notNull()
+    .unique()
+    .references(() => user.id, { onDelete: "cascade" }),
+  headline: text("headline"),
+  bio: text("bio"),
+  summary: text("summary"),
+  location: text("location"),
+  phone: text("phone"),
+  website: text("website"),
+  linkedinUrl: text("linkedin_url"),
+  githubUrl: text("github_url"),
+  yearsExperience: integer("years_experience"),
+  // Stored as a Postgres text array: ["React", "TypeScript", ...]
+  skills: text("skills").array().notNull().default([]),
+  openToWork: boolean("open_to_work").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at")
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date()),
+});
+
+export const candidateExperiences = pgTable("candidate_experiences", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => nanoid()),
+  userId: text("user_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  company: text("company").notNull(),
+  location: text("location"),
+  startDate: text("start_date").notNull(),
+  endDate: text("end_date"),
+  isCurrent: boolean("is_current").notNull().default(false),
+  description: text("description"),
+  // Used for drag-to-reorder on the profile page
+  order: integer("order").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at")
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date()),
+});
+
+export const candidateEducation = pgTable("candidate_education", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => nanoid()),
+  userId: text("user_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  school: text("school").notNull(),
+  degree: text("degree"),
+  fieldOfStudy: text("field_of_study"),
+  startDate: text("start_date"),
+  endDate: text("end_date"),
+  description: text("description"),
+  order: integer("order").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at")
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date()),
+});
+
+export const candidateCertifications = pgTable("candidate_certifications", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => nanoid()),
+  userId: text("user_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  issuingOrg: text("issuing_org").notNull(),
+  issueDate: text("issue_date"),
+  expirationDate: text("expiration_date"),
+  credentialUrl: text("credential_url"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at")
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date()),
+});
+
+export const candidateResumes = pgTable("candidate_resumes", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => nanoid()),
+  userId: text("user_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  // Direct file URL (S3 / R2 / Uploadthing — no Convex storageId needed)
+  fileUrl: text("file_url").notNull(),
+  fileName: text("file_name").notNull(),
+  fileSize: integer("file_size"),
+  contentType: text("content_type"),
+  isDefault: boolean("is_default").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at")
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date()),
+});
+
+// ─── Job Listings ─────────────────────────────────────────────────────────────
+
+export const jobListings = pgTable("job_listings", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => nanoid()),
+  companyId: text("company_id")
+    
+    .references(() => companies.id, { onDelete: "cascade" }),
+    agentId:          text("agent_id").references(() => agents.id),  // nullable
+autoOrchestrate:  boolean("auto_orchestrate").default(false),
+  // Denormalized — avoids joining companies on every list query
+  companyName: text("company_name").notNull(),
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  location: text("location").notNull(),
+  employmentType: employmentTypeEnum("employment_type").notNull(),
+  workplaceType: workplaceTypeEnum("workplace_type").notNull(),
+  salaryMin: integer("salary_min"),
+  salaryMax: integer("salary_max"),
+  salaryCurrency: text("salary_currency").default("USD"),
+  // Postgres text[] — supports array containment operator @>
+  tags: text("tags").array().notNull().default([]),
+  // Concatenation of title + stripped description + location + companyName + tags.
+  // Rebuilt on every create/update. Used for ILIKE search (no extra index needed).
+  searchText: text("search_text").notNull().default(""),
+  isActive: boolean("is_active").notNull().default(true),
+  featured: boolean("featured").notNull().default(false),
+  
+  // ── autoCloseOnAccept ─────────────────────────────────────────────────────
+  // When true: accepting any candidate triggers two side effects atomically
+  // (inside a db.transaction in the tRPC router):
+  //   1. The job is set to isActive = false + closedAt = now
+  //   2. Every other submitted/in_review applicant receives a
+  //      "job_closed" notification
+  // Best for single-hire roles. Leave false for multi-hire positions.
+  autoCloseOnAccept: boolean("auto_close_on_accept").notNull().default(false),
+  // Denormalized counter — incremented on apply, no COUNT() needed on list views
+  applicationCount: integer("application_count").notNull().default(0),
+  postedByUserId: text("posted_by_user_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at")
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date()),
+  closedAt: timestamp("closed_at"),
+});
+
+// ─── Applications ─────────────────────────────────────────────────────────────
+
+export const applicationNewColumns = {
+  // ── Identity ───────────────────────────────────────────────────────────────
+  fullName:       text("full_name"),          // required
+  email:          text("email"),              // required
+  phone:          text("phone"),              // optional
+  locationCity:   text("location_city"),      // required  e.g. "Almaty, KZ"
+
+  // ── Professional background ────────────────────────────────────────────────
+  currentRole:    text("current_role"),       // "Senior Engineer at XYZ"
+  experienceYears: text("experience_years"),  // "3-5"  (enum-like string)
+  linkedin:       text("linkedin"),           // URL optional
+  portfolio:      text("portfolio"),          // URL optional
+
+  // ── Application details ────────────────────────────────────────────────────
+  motivation:     text("motivation"),         // "Why this company?"  required
+  skills:         text("skills"),             // free-text list        required
+  education:      jsonb("education")          // EducationEntry[]      optional
+                    .$type<Array<{
+                      institution: string;
+                      degree: string;
+                      field: string;
+                      graduationYear: string;
+                    }>>(),
+
+  // ── Documents ─────────────────────────────────────────────────────────────
+  cvUrl:              text("cv_url"),          // required — uploaded PDF/doc
+  coverLetterUrl:     text("cover_letter_url"), // optional
+
+  // ── Consent ────────────────────────────────────────────────────────────────
+  termsAccepted:  boolean("terms_accepted").default(false),
+
+  // ── Recruiter notes (added by owner later) ─────────────────────────────────
+  recruiterNotes: text("recruiter_notes"),
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FULL TABLE REFERENCE — replace your existing applications table with this
+// (keeping whatever columns you already had + the new ones above)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const applications = pgTable("applications", {
+  id:               text("id").primaryKey().$defaultFn(() => nanoid()),
+  jobId:            text("job_id").notNull(),        // FK → jobListings.id
+  applicantUserId:  text("applicant_user_id"),       // nullable — public submissions have no account
+
+  // Public form identity
+  fullName:         text("full_name").notNull(),
+  email:            text("email").notNull(),
+  phone:            text("phone"),
+  locationCity:     text("location_city").notNull(),
+
+  // Professional background
+  currentRole:      text("current_role").notNull(),
+  experienceYears:  text("experience_years").notNull(), // "0-1" | "1-3" | "3-5" | "5-10" | "10+"
+  linkedin:         text("linkedin"),
+  portfolio:        text("portfolio"),
+
+  // Application narrative
+  motivation:       text("motivation").notNull(),
+  skills:           text("skills").notNull(),
+  education:        jsonb("education").$type<Array<{
+                      institution: string;
+                      degree: string;
+                      field: string;
+                      graduationYear: string;
+                    }>>(),
+
+  // Documents
+  cvUrl:            text("cv_url").notNull(),
+  coverLetterUrl:   text("cover_letter_url"),
+cvAnalysisId: text("cv_analysis_id"),   // FK → cvAnalysis.id (after auto-analysis)
+meetingId:    text("meeting_id"),        // FK → meetings.id (after auto-meeting)
+autoHandled:  boolean("auto_handled").default(false), // was this auto-orchestrated?
+  // Status & consent
+  status:           applicationStatusEnum("status").default("submitted").notNull(),
+  termsAccepted:    boolean("terms_accepted").default(false).notNull(),
+  recruiterNotes:   text("recruiter_notes"),
+
+  // Timestamps
+  createdAt:        timestamp("created_at").defaultNow().notNull(),
+  updatedAt:        timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
+});
+// ─── Favorites ────────────────────────────────────────────────────────────────
+
+export const favorites = pgTable(
+  "favorites",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => nanoid()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    jobId: text("job_id")
+      .notNull()
+      .references(() => jobListings.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+
+);
+
+// ─── Notifications ────────────────────────────────────────────────────────────
+
+export const notifications = pgTable("notifications", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => nanoid()),
+  userId: text("user_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  type: notificationTypeEnum("type").notNull(),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  linkUrl: text("link_url"),
+  // Flexible JSON payload: { jobId, applicationId, status, ... }
+  metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+  isRead: boolean("is_read").notNull().default(false),
+  readAt: timestamp("read_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// =============================================================================
+// TYPE EXPORTS
+// =============================================================================
+
+// Existing
 export type CVAnalysis = typeof cvAnalysis.$inferSelect;
 export type NewCVAnalysis = typeof cvAnalysis.$inferInsert;
 export type JobCriteria = typeof jobCriteria.$inferSelect;
 export type NewJobCriteria = typeof jobCriteria.$inferInsert;
 export type DemoBooking = typeof demoBookings.$inferSelect;
 export type NewDemoBooking = typeof demoBookings.$inferInsert;
+
+// New
+export type Company = typeof companies.$inferSelect;
+export type NewCompany = typeof companies.$inferInsert;
+export type CompanyMember = typeof companyMembers.$inferSelect;
+export type JobListing = typeof jobListings.$inferSelect;
+export type NewJobListing = typeof jobListings.$inferInsert;
+export type Application = typeof applications.$inferSelect;
+export type NewApplication = typeof applications.$inferInsert;
+export type Favorite = typeof favorites.$inferSelect;
+export type Notification = typeof notifications.$inferSelect;
+export type CandidateProfile = typeof candidateProfiles.$inferSelect;
+export type CandidateExperience = typeof candidateExperiences.$inferSelect;
+export type CandidateEducation = typeof candidateEducation.$inferSelect;
+export type CandidateCertification = typeof candidateCertifications.$inferSelect;
+export type CandidateResume = typeof candidateResumes.$inferSelect;

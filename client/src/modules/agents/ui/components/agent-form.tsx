@@ -6,13 +6,14 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { agentsInsertSchema } from "../../schemas";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { GeneratedAvatar } from "@/components/generated-avatar";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { CommandSelect } from "@/components/command-select";
 
 interface AgentFormProps {
   onSuccess?: () => void;
@@ -69,6 +70,7 @@ export const AgentForm = ({
     resolver: zodResolver(agentsInsertSchema),
     defaultValues: {
       name: initialValues?.name ?? "",
+      agentType: initialValues?.agentType ?? "active", // 🆕 NEW
       instructions: initialValues?.instructions ?? "",
       instructions2: initialValues?.instructions2 ?? ""
     },
@@ -114,6 +116,72 @@ export const AgentForm = ({
                     className="h-12 border-primary/30 focus:border-primary font-light"
                   />
                 </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {/* 🆕 NEW: Agent Type Selection */}
+          <FormField
+            name="agentType"
+            control={form.control}
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-sm font-semibold text-primary tracking-tight">
+                  Agent Type
+                </FormLabel>
+                <FormControl>
+                  <CommandSelect
+                    options={[
+                      {
+                        id: "active",
+                        value: "active",
+                        children: (
+                          <div className="space-y-1 py-2">
+                            <div className="font-semibold text-sm flex items-center gap-2">
+                              <span className="text-lg">🎙️</span>
+                              Active Interviewer
+                            </div>
+                            <div className="text-xs text-muted-foreground pl-7">
+                              Speaks first, asks questions, drives the conversation proactively
+                            </div>
+                          </div>
+                        ),
+                      },
+                      {
+                        id: "passive",
+                        value: "passive",
+                        children: (
+                          <div className="space-y-1 py-2">
+                            <div className="font-semibold text-sm flex items-center gap-2">
+                              <span className="text-lg">📝</span>
+                              Passive Assistant
+                            </div>
+                            <div className="text-xs text-muted-foreground pl-7">
+                              Takes notes silently, only speaks when directly addressed by name or "AI"
+                            </div>
+                          </div>
+                        ),
+                      },
+                    ]}
+                    onSelect={field.onChange}
+                    value={field.value}
+                    placeholder="Select agent type"
+                  />
+                </FormControl>
+                <FormDescription className="text-xs font-light opacity-60">
+                  {field.value === "active" ? (
+                    <>
+                      <span className="font-semibold">Active agents</span> conduct interviews and drive conversations. 
+                      Best for: structured interviews, assessments, candidate screening.
+                    </>
+                  ) : (
+                    <>
+                      <span className="font-semibold">Passive agents</span> observe and take notes. They only respond when explicitly called by name. 
+                      Best for: team meetings, note-taking, Q&A support.
+                    </>
+                  )}
+                </FormDescription>
                 <FormMessage />
               </FormItem>
             )}

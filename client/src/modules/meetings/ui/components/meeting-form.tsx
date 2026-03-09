@@ -15,13 +15,22 @@ import { useEffect, useState } from "react";
 import { CommandSelect } from "@/components/command-select";
 import { GeneratedAvatar } from "@/components/generated-avatar";
 import { NewAgentDialog } from "@/modules/agents/ui/components/new-agent-dialog";
-import { Check, Copy, ExternalLink, PlusCircle, Video } from "lucide-react";
+import { Check, Copy, ExternalLink, FileText, PlusCircle, Video } from "lucide-react";
 
 interface MeetingFormProps {
   onCancel?: () => void;
   initialValues?: MeetingGetOne;
   onSuccess?: (id: string) => void;
 }
+
+// Badge colour per recommendation value
+const recommendationColour: Record<string, string> = {
+  "Strong Hire": "text-emerald-600",
+  "Hire": "text-green-600",
+  "Interview": "text-blue-600",
+  "Maybe": "text-amber-600",
+  "Pass": "text-red-500",
+};
 
 export const MeetingForm = ({
   onSuccess,
@@ -33,6 +42,7 @@ export const MeetingForm = ({
   const queryClient = useQueryClient();
   const [openNewAgentDialog, setOpenNewAgentDialog] = useState(false);
   const [agentSearch, setAgentSearch] = useState("");
+  const [cvSearch, setCvSearch] = useState("");
   const [copied, setCopied] = useState(false);
   const [createdId, setCreatedId] = useState<string | null>(null);
   const [updatedId, setUpdatedId] = useState<string | null>(null);
@@ -49,6 +59,11 @@ export const MeetingForm = ({
       pageSize: 100,
       search: agentSearch,
     }),
+  );
+
+  // ✅ NEW: Fetch all CV analyses for the current user
+  const cvAnalyses = useQuery(
+    trpc.candidates.getUserCVAnalyses.queryOptions(),
   );
 
   const createMeeting = useMutation(
@@ -91,6 +106,7 @@ export const MeetingForm = ({
     defaultValues: {
       name: initialValues?.name ?? "",
       agentId: initialValues?.agentId ?? "",
+      cvAnalysisId: initialValues?.cvAnalysisId ?? null,
     },
   });
 
@@ -113,19 +129,22 @@ export const MeetingForm = ({
     }
   }, [createdId, updatedId]);
 
-  // Success State - Solid Background
+  // ✅ Filter CV analyses by search string (client-side, list is small)
+  const filteredCVs = (cvAnalyses.data ?? []).filter((cv) =>
+    !cvSearch || cv.candidateName?.toLowerCase().includes(cvSearch.toLowerCase())
+  );
+
+  // Success State
   if (createdId || updatedId) {
     return (
       <div className="bg-white border-2 border-primary/10 shadow-orange-lg">
         <div className="p-8 text-center space-y-6">
-          {/* Success Icon */}
           <div className="flex justify-center mb-6">
             <div className="w-20 h-20 border-2 border-primary/20 bg-primary/5 flex items-center justify-center">
               <Check className="h-10 w-10 text-primary" strokeWidth={1.5} />
             </div>
           </div>
 
-          {/* Title */}
           <div className="space-y-2">
             <h2 className="text-2xl font-semibold text-primary tracking-tight">
               Meeting {createdId ? "Created" : "Updated"}
@@ -135,7 +154,6 @@ export const MeetingForm = ({
             </p>
           </div>
 
-          {/* Link Copy Section */}
           <div className="max-w-md mx-auto pt-4">
             <div className="flex gap-0">
               <Input
@@ -157,7 +175,6 @@ export const MeetingForm = ({
             </div>
           </div>
 
-          {/* Actions */}
           <div className="flex flex-col sm:flex-row gap-3 justify-center pt-6 border-t border-primary/10">
             <Button
               onClick={() => router.push(`/meeting-call/${createdId || updatedId}`)}
@@ -183,7 +200,7 @@ export const MeetingForm = ({
     );
   }
 
-  // Form State - Solid Background
+  // Form State
   return (
     <>
       <NewAgentDialog open={openNewAgentDialog} onOpenChange={setOpenNewAgentDialog} />
@@ -229,12 +246,13 @@ export const MeetingForm = ({
                     Assigned Agent
                   </FormLabel>
                   <FormControl className="bg-amber-500">
-                    <CommandSelect className="bg-amber-500"
+                    <CommandSelect
+                      className="bg-amber-500"
                       options={(agents.data?.items ?? []).map((agent) => ({
                         id: agent.id,
                         value: agent.id,
                         children: (
-                          <div className="flex items-center gap-2 ">
+                          <div className="flex items-center gap-2">
                             <GeneratedAvatar
                               seed={agent.name}
                               variant="initials"
@@ -265,6 +283,81 @@ export const MeetingForm = ({
               )}
             />
 
+            {/* ✅ NEW: CV Analysis Selection */}
+            <FormField
+              name="cvAnalysisId"
+              control={form.control}
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm font-semibold text-primary tracking-tight">
+                    Candidate CV <span className="font-light opacity-60">(optional)</span>
+                  </FormLabel>
+                  <FormControl>
+                    <CommandSelect
+                      options={[
+                        // "None" option to clear selection
+                        {
+                          id: "__none__",
+                          value: "__none__",
+                          children: (
+                            <div className="flex items-center gap-2 text-muted-foreground">
+                              <FileText size={16} strokeWidth={1.5} />
+                              <span className="font-light italic">No CV — general interview</span>
+                            </div>
+                          ),
+                        },
+                        ...filteredCVs.map((cv) => ({
+                          id: cv.id,
+                          value: cv.id,
+                          children: (
+                            <div className="flex items-center justify-between w-full gap-3">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <FileText size={16} strokeWidth={1.5} className="text-primary shrink-0" />
+                                <div className="min-w-0">
+                                  <p className="font-light truncate">
+                                    {cv.candidateName ?? "Unknown Candidate"}
+                                  </p>
+                                  {cv.currentRole && (
+                                    <p className="text-xs opacity-50 font-light truncate">
+                                      {cv.currentRole}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                {cv.overallScore != null && (
+                                  <span className="text-xs font-semibold text-primary">
+                                    {cv.overallScore}/100
+                                  </span>
+                                )}
+                                {cv.recommendation && (
+                                  <span
+                                    className={`text-xs font-semibold ${
+                                      recommendationColour[cv.recommendation] ?? "text-muted-foreground"
+                                    }`}
+                                  >
+                                    {cv.recommendation}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          ),
+                        })),
+                      ]}
+                      onSelect={(val) => field.onChange(val === "__none__" ? null : val)}
+                      onSearch={setCvSearch}
+                      value={field.value ?? "__none__"}
+                      placeholder="Select candidate CV (optional)"
+                    />
+                  </FormControl>
+                  <FormDescription className="text-xs font-light opacity-60">
+                    Attach a CV analysis so the AI acts as an informed HR interviewer during the call.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             {/* Action Buttons */}
             <div className="flex justify-end gap-3 pt-6 border-t border-primary/10">
               {onCancel && (
@@ -282,7 +375,7 @@ export const MeetingForm = ({
               <Button
                 disabled={isPending}
                 type="submit"
-                className="h-12 px-6 border-2 border-primary/20  hover:border-black text-primary font-light tracking-wide uppercase text-sm hover:bg-amber-500 "
+                className="h-12 px-6 border-2 border-primary/20 hover:border-black text-primary font-light tracking-wide uppercase text-sm hover:bg-amber-500"
               >
                 {isPending ? (
                   <span className="flex items-center gap-2">

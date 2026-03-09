@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 from vision_agents.core import agents
-from vision_agents.plugins import getstream, openai
+from vision_agents.plugins import getstream, openai, gemini
 from vision_agents.core.edge.types import User
 from vision_agents.core.events import (
     CallSessionParticipantJoinedEvent, 
@@ -48,6 +48,7 @@ CLEANUP_INACTIVE_AFTER = 3600  # 1 hour
 class StartMeetingRequest(BaseModel):
     call_id: str
     agent_name: Optional[str] = "AI Meeting Assistant"
+    agent_type: str = "active"  # 🆕 NEW: "active" or "passive"
     agent_instructions: Optional[str] = "You are a helpful AI meeting assistant."
     agent_id: str = "agent-bot"
 
@@ -103,10 +104,10 @@ async def save_agent_response_to_transcript(call_id: str, agent_id: str, agent_r
         meeting = await get_meeting_data(call_id)
         if meeting and len(meeting.get("transcript", [])) < MAX_TRANSCRIPT_SIZE:
             meeting["transcript"].append({
-                "speaker": agent_id,  # ✅ Will be renamed to speaker_id in webhook
+                "speaker": agent_id,
                 "text": agent_response_buffer['text'],
                 "timestamp": agent_response_buffer['start_time'],
-                "type": "agent"  # ✅ Mark as agent message
+                "type": "agent"
             })
             logger.info(f"✅ Saved agent response to transcript: {len(agent_response_buffer['text'])} chars")
         
@@ -117,9 +118,10 @@ async def save_agent_response_to_transcript(call_id: str, agent_id: str, agent_r
 
 async def run_agent(call_id: str, agent_name: str, instructions: str, agent_id: str):
     """
+    ✅ EXISTING: ACTIVE agent - unchanged
     Optimized background task to run the meeting assistant agent
     """
-    logger.info(f"🚀 Starting agent for call: {call_id}")
+    logger.info(f"🚀 Starting ACTIVE agent for call: {call_id}")
     
     meeting_data = await get_meeting_data(call_id)
     if not meeting_data:
@@ -130,7 +132,6 @@ async def run_agent(call_id: str, agent_name: str, instructions: str, agent_id: 
     call = None
     
     try:
-        # ✅ OPTIMIZED OPENAI CONFIGURATION (more stable than Gemini)
         agent = agents.Agent(
             edge=getstream.Edge(),
             agent_user=User(
@@ -141,15 +142,11 @@ async def run_agent(call_id: str, agent_name: str, instructions: str, agent_id: 
             llm=openai.Realtime(),
         )
         
-        await update_meeting_data(call_id, {'agent': agent})
+        await update_meeting_data(call_id, {'agent': agent, 'agent_type': 'active'})
         
-        # Track last activity for stall detection
         last_activity = {'time': time.time()}
-        
-        # Track agent response chunks for assembly
         agent_response_buffer = {'text': '', 'start_time': None}
         
-        # ✅ LIGHTWEIGHT EVENT HANDLERS (minimal processing)
         @agent.events.subscribe
         async def handle_session_started(event: CallSessionStartedEvent):
             logger.info(f"✅ Call Started: {call_id}")
@@ -157,8 +154,179 @@ async def run_agent(call_id: str, agent_name: str, instructions: str, agent_id: 
                 "is_active": True,
                 "session_started": datetime.now().isoformat()
             })
+            asyncio.create_task(initialize_chat_channel(agent, call_id))
+        
+        @agent.events.subscribe
+        async def handle_participant_joined(event: CallSessionParticipantJoinedEvent):
+            if event.participant.user.id == agent_id:
+                return
+            participant_name = event.participant.user.name
+            logger.info(f"👤 Participant joined: {participant_name}")
+            last_activity['time'] = time.time()
+        
+        @agent.events.subscribe
+        async def handle_participant_left(event: CallSessionParticipantLeftEvent):
+            if event.participant.user.id == agent_id:
+                return
+            participant_name = event.participant.user.name
+            logger.info(f"👋 Participant left: {participant_name}")
+        
+        @agent.events.subscribe
+        async def handle_transcription(event: RealtimeUserSpeechTranscriptionEvent):
+            if not event.text or len(event.text.strip()) == 0:
+                return
             
-            # Initialize chat channel in background (non-blocking)
+            last_activity['time'] = time.time()
+            await save_agent_response_to_transcript(call_id, agent_id, agent_response_buffer)
+            
+            speaker = getattr(event, 'participant_id', 'Unknown')
+            transcript_text = event.text
+            
+            meeting = await get_meeting_data(call_id)
+            if meeting and len(meeting.get("transcript", [])) < MAX_TRANSCRIPT_SIZE:
+                transcript_entry = {
+                    "speaker": speaker,
+                    "text": transcript_text,
+                    "timestamp": datetime.now().isoformat(),
+                    "type": "user"
+                }
+                meeting["transcript"].append(transcript_entry)
+                meeting["last_activity"] = datetime.now().isoformat()
+                logger.debug(f"📝 [{speaker}]: {transcript_text[:50]}...")
+            else:
+                logger.warning(f"⚠️ Transcript size limit reached for {call_id}")
+        
+        @agent.events.subscribe
+        async def handle_llm_response(event: LLMResponseChunkEvent):
+            last_activity['time'] = time.time()
+            response_text = None
+            
+            if hasattr(event, 'delta') and event.delta:
+                response_text = event.delta
+            elif hasattr(event, 'text') and event.text:
+                response_text = event.text
+            elif hasattr(event, 'content') and event.content:
+                response_text = event.content
+            elif hasattr(event, 'chunk') and event.chunk:
+                response_text = event.chunk
+            
+            if not response_text:
+                logger.warning(f"⚠️ LLMResponseChunkEvent has no recognized text attribute")
+                return
+            
+            if not agent_response_buffer['start_time']:
+                agent_response_buffer['start_time'] = datetime.now().isoformat()
+            
+            agent_response_buffer['text'] += response_text
+            
+            if len(agent_response_buffer['text']) % 50 == 0:
+                logger.info(f"🤖 Agent response length: {len(agent_response_buffer['text'])} chars")
+        
+        @agent.events.subscribe
+        async def handle_session_ended(event: CallSessionEndedEvent):
+            logger.info(f"🏁 Meeting ended: {call_id}")
+            await save_agent_response_to_transcript(call_id, agent_id, agent_response_buffer)
+            
+            meeting = await get_meeting_data(call_id)
+            if meeting:
+                await update_meeting_data(call_id, {
+                    "is_active": False,
+                    "ended_at": datetime.now().isoformat()
+                })
+                logger.info(f"📊 Final Stats - Transcript entries: {len(meeting.get('transcript', []))}")
+        
+        watchdog_task = asyncio.create_task(
+            monitor_agent_activity(call_id, last_activity, STALL_TIMEOUT)
+        )
+        
+        await agent.create_user()
+        call = agent.edge.client.video.call("default", call_id)
+        logger.info(f"📞 Joining call: {call_id}")
+        
+        async with agent.join(call):
+            logger.info(f"✅ Joined call successfully: {call_id}")
+            
+            # ✅ ACTIVE: Send initial greeting
+            try:
+                greeting = extract_greeting(instructions)
+                await agent.llm.simple_response(greeting)
+                logger.info(f"💬 Active agent sent initial greeting")
+            except Exception as e:
+                logger.error(f"⚠️ Failed to send greeting: {e}")
+            
+            await agent.finish()
+        
+        watchdog_task.cancel()
+        logger.info(f"✅ Active agent finished successfully for call: {call_id}")
+    
+    except asyncio.CancelledError:
+        logger.info(f"🛑 Agent task cancelled for call: {call_id}")
+        raise
+    
+    except Exception as e:
+        logger.error(f"❌ Error in agent for call {call_id}: {str(e)}", exc_info=True)
+        await update_meeting_data(call_id, {
+            "is_active": False,
+            "error": str(e),
+            "error_time": datetime.now().isoformat()
+        })
+    
+    finally:
+        await update_meeting_data(call_id, {
+            "is_active": False,
+            "finished_at": datetime.now().isoformat()
+        })
+        logger.info(f"🧹 Cleanup completed for call: {call_id}")
+
+
+async def run_passive_agent(call_id: str, agent_name: str, instructions: str, agent_id: str):
+    """
+    🆕 NEW: PASSIVE agent - stays silent unless triggered
+    Background task for passive meeting assistant
+    - Stays silent unless triggered by agent name or "AI"
+    - Takes complete notes (user + agent messages)
+    - Uses OpenAI Realtime
+    - Supports CV context
+    """
+    logger.info(f"🚀 Starting PASSIVE agent for call: {call_id}")
+    logger.info(f"   Agent Name: {agent_name}")
+    logger.info(f"   Will respond to: '{agent_name}' or 'AI'")
+    
+    meeting_data = await get_meeting_data(call_id)
+    if not meeting_data:
+        logger.error(f"❌ Meeting {call_id} not found in active_meetings!")
+        return
+    
+    agent = None
+    call = None
+    
+    try:
+        agent = agents.Agent(
+            edge=getstream.Edge(),
+            agent_user=User(
+                id=agent_id,
+                name=agent_name,
+            ),
+            instructions=instructions,  # Already has passive prefix from webhook
+            llm=gemini.Realtime(),
+        )
+        
+        await update_meeting_data(call_id, {
+            'agent': agent,
+            'agent_type': 'passive',
+            'agent_name': agent_name
+        })
+        
+        last_activity = {'time': time.time()}
+        agent_response_buffer = {'text': '', 'start_time': None}
+        
+        @agent.events.subscribe
+        async def handle_session_started(event: CallSessionStartedEvent):
+            logger.info(f"✅ Call Started: {call_id}")
+            await update_meeting_data(call_id, {
+                "is_active": True,
+                "session_started": datetime.now().isoformat()
+            })
             asyncio.create_task(initialize_chat_channel(agent, call_id))
         
         @agent.events.subscribe
@@ -179,79 +347,109 @@ async def run_agent(call_id: str, agent_name: str, instructions: str, agent_id: 
         @agent.events.subscribe
         async def handle_transcription(event: RealtimeUserSpeechTranscriptionEvent):
             """
-            Optimized transcription handler with size limits
-            ALSO saves any pending agent response before recording user message
+            🔥 PASSIVE AGENT: Transcribes + detects triggers
             """
             if not event.text or len(event.text.strip()) == 0:
                 return
             
             last_activity['time'] = time.time()
-            
-            # ✅ SAVE PREVIOUS AGENT RESPONSE (if any exists in buffer)
-            # This ensures agent responses are saved before the next user message
             await save_agent_response_to_transcript(call_id, agent_id, agent_response_buffer)
             
             speaker = getattr(event, 'participant_id', 'Unknown')
             transcript_text = event.text
             
-            # ✅ Prevent memory issues with transcript size limits
             meeting = await get_meeting_data(call_id)
             if meeting and len(meeting.get("transcript", [])) < MAX_TRANSCRIPT_SIZE:
+                # Save user message
                 transcript_entry = {
-                    "speaker": speaker,  # ✅ Will be renamed to speaker_id in webhook
+                    "speaker": speaker,
                     "text": transcript_text,
-                    "timestamp": datetime.now().isoformat(),  # ✅ ISO format, converted to start_ts/end_ts in webhook
-                    "type": "user"  # ✅ Mark as user message
+                    "timestamp": datetime.now().isoformat(),
+                    "type": "user"
                 }
                 meeting["transcript"].append(transcript_entry)
                 meeting["last_activity"] = datetime.now().isoformat()
                 
-                # Lightweight logging (no excessive detail)
-                logger.debug(f"📝 [{speaker}]: {transcript_text[:50]}...")
+                logger.info(f"📝 USER [{speaker}]: {transcript_text[:100]}...")
+                
+                # 🔥 TRIGGER DETECTION
+                agent_name_lower = agent_name.lower()
+                text_lower = transcript_text.lower()
+                
+                triggered = False
+                
+                # Check for agent name
+                if agent_name_lower in text_lower:
+                    triggered = True
+                    logger.info(f"🔔 PASSIVE AGENT TRIGGERED by name: '{agent_name}'")
+                
+                # Check for "AI" (word boundary check)
+                elif " ai " in f" {text_lower} " or text_lower.startswith("ai ") or text_lower.endswith(" ai"):
+                    triggered = True
+                    logger.info(f"🔔 PASSIVE AGENT TRIGGERED by 'AI'")
+                
+                if triggered:
+                    # Build context from recent transcript
+                    context = "MEETING TRANSCRIPT (Recent):\n\n"
+                    recent_entries = meeting.get('transcript', [])[-10:]
+                    for entry in recent_entries:
+                        context += f"[{entry.get('speaker', 'Unknown')}]: {entry.get('text', '')}\n"
+                    
+                    # Extract question (remove trigger words)
+                    question = transcript_text
+                    for trigger_word in [agent_name, agent_name_lower, "ai", "AI"]:
+                        question = question.replace(trigger_word, "").strip()
+                    question = question.lstrip(",.:;").strip()
+                    
+                    # Build prompt
+                    prompt = f"""
+{context}
+
+USER QUESTION: {question}
+
+Provide a concise, helpful answer based ONLY on the meeting transcript above.
+Be professional and brief. Use only information from this meeting.
+"""
+                    
+                    try:
+                        await agent.llm.simple_response(prompt)
+                        logger.info(f"💬 PASSIVE AGENT responding to trigger")
+                    except Exception as e:
+                        logger.error(f"❌ Error in triggered response: {e}")
+                else:
+                    logger.debug(f"📝 PASSIVE AGENT staying silent (no trigger)")
             else:
-                logger.warning(f"⚠️ Transcript size limit reached for {call_id}")
+                logger.warning(f"⚠️ Transcript size limit reached")
         
         @agent.events.subscribe
         async def handle_llm_response(event: LLMResponseChunkEvent):
-            """
-            Track agent responses for stall detection AND transcript accumulation
-            """
             last_activity['time'] = time.time()
             response_text = None
+            
             if hasattr(event, 'delta') and event.delta:
-                logger.debug(f"🤖 Agent: {event.delta[:50]}...")
                 response_text = event.delta
             elif hasattr(event, 'text') and event.text:
-                logger.debug(f"🤖 Agent: {event.text[:50]}...")
                 response_text = event.text
             elif hasattr(event, 'content') and event.content:
-                logger.debug(f"🤖 Agent: {event.content[:50]}...")
                 response_text = event.content
             elif hasattr(event, 'chunk') and event.chunk:
-                logger.debug(f"🤖 Agent: {event.chunk[:50]}...")
                 response_text = event.chunk
+            
             if not response_text:
-                logger.warning(f"⚠️ LLMResponseChunkEvent attributes: {dir(event)}")
+                logger.warning(f"⚠️ LLMResponseChunkEvent has no recognized text")
                 return
-
-                
-                # ✅ Accumulate agent response chunks
+            
             if not agent_response_buffer['start_time']:
-                   agent_response_buffer['start_time'] = datetime.now().isoformat()
+                agent_response_buffer['start_time'] = datetime.now().isoformat()
             
             agent_response_buffer['text'] += response_text
-
+            
             if len(agent_response_buffer['text']) % 50 == 0:
-                logger.info(f"🤖 Agent response length: {len(agent_response_buffer['text'])} chars")
+                logger.info(f"🤖 Agent response: {len(agent_response_buffer['text'])} chars")
         
         @agent.events.subscribe
         async def handle_session_ended(event: CallSessionEndedEvent):
-            """
-            Clean session end - save any remaining agent response
-            """
             logger.info(f"🏁 Meeting ended: {call_id}")
-            
-            # ✅ SAVE ANY REMAINING AGENT RESPONSE before ending
             await save_agent_response_to_transcript(call_id, agent_id, agent_response_buffer)
             
             meeting = await get_meeting_data(call_id)
@@ -260,14 +458,15 @@ async def run_agent(call_id: str, agent_name: str, instructions: str, agent_id: 
                     "is_active": False,
                     "ended_at": datetime.now().isoformat()
                 })
-                logger.info(f"📊 Final Stats - Transcript entries: {len(meeting.get('transcript', []))}")
+                
+                user_msgs = len([t for t in meeting.get("transcript", []) if t.get("type") == "user"])
+                agent_msgs = len([t for t in meeting.get("transcript", []) if t.get("type") == "agent"])
+                logger.info(f"📊 Final Stats - User: {user_msgs}, Agent: {agent_msgs}")
         
-        # ✅ START WATCHDOG for stall detection
         watchdog_task = asyncio.create_task(
             monitor_agent_activity(call_id, last_activity, STALL_TIMEOUT)
         )
         
-        # Join the call
         await agent.create_user()
         call = agent.edge.client.video.call("default", call_id)
         logger.info(f"📞 Joining call: {call_id}")
@@ -275,29 +474,16 @@ async def run_agent(call_id: str, agent_name: str, instructions: str, agent_id: 
         async with agent.join(call):
             logger.info(f"✅ Joined call successfully: {call_id}")
             
-            # ✅ CRITICAL: Send initial greeting to start conversation
-            try:
-                # Extract first question from instructions or use default
-                greeting = extract_greeting(instructions)
-                await agent.llm.simple_response(greeting)
-                logger.info(f"💬 Agent sent initial greeting")
-            except Exception as e:
-                logger.error(f"⚠️ Failed to send greeting: {e}")
+            # 🔥 PASSIVE: NO GREETING - Just stay silent
+            logger.info(f"📝 Passive agent ready - will respond to '{agent_name}' or 'AI'")
             
-            # Keep agent alive until meeting ends
             await agent.finish()
         
-        # Cancel watchdog
         watchdog_task.cancel()
-        
-        logger.info(f"✅ Agent finished successfully for call: {call_id}")
-    
-    except asyncio.CancelledError:
-        logger.info(f"🛑 Agent task cancelled for call: {call_id}")
-        raise
+        logger.info(f"✅ Passive agent finished for call: {call_id}")
     
     except Exception as e:
-        logger.error(f"❌ Error in agent for call {call_id}: {str(e)}", exc_info=True)
+        logger.error(f"❌ Error in passive agent: {str(e)}", exc_info=True)
         await update_meeting_data(call_id, {
             "is_active": False,
             "error": str(e),
@@ -305,7 +491,6 @@ async def run_agent(call_id: str, agent_name: str, instructions: str, agent_id: 
         })
     
     finally:
-        # Always mark as inactive
         await update_meeting_data(call_id, {
             "is_active": False,
             "finished_at": datetime.now().isoformat()
@@ -328,7 +513,7 @@ async def monitor_agent_activity(call_id: str, last_activity: dict, timeout: int
     """Watchdog to detect stalled agents"""
     try:
         while True:
-            await asyncio.sleep(10)  # Check every 10 seconds
+            await asyncio.sleep(10)
             
             meeting = await get_meeting_data(call_id)
             if not meeting or not meeting.get("is_active"):
@@ -350,14 +535,12 @@ async def monitor_agent_activity(call_id: str, last_activity: dict, timeout: int
 
 def extract_greeting(instructions: str) -> str:
     """Extract first greeting from instructions or provide default"""
-    # Try to extract first sentence/question
     lines = instructions.split('.')
     if lines:
         first_line = lines[0].strip()
         if first_line:
             return first_line
     
-    # Default greeting
     return "Hello! I'm your AI meeting assistant. How can I help you today?"
 
 
@@ -365,7 +548,7 @@ async def cleanup_old_meetings():
     """Background task to cleanup old inactive meetings"""
     while True:
         try:
-            await asyncio.sleep(300)  # Run every 5 minutes
+            await asyncio.sleep(300)
             
             now = time.time()
             to_delete = []
@@ -390,7 +573,6 @@ async def cleanup_old_meetings():
             logger.error(f"Error in cleanup task: {e}")
 
 
-# Track app startup time
 app_start_time = time.time()
 
 
@@ -398,24 +580,15 @@ app_start_time = time.time()
 async def lifespan(app: FastAPI):
     """Lifespan context manager for startup and shutdown"""
     logger.info("🚀 Starting Meeting Assistant API")
-    
-    # Start cleanup task
     cleanup_task = asyncio.create_task(cleanup_old_meetings())
-    
     yield
-    
     logger.info("🛑 Shutting down Meeting Assistant API")
-    
-    # Cancel cleanup task
     cleanup_task.cancel()
-    
-    # Cleanup all active meetings
     async with meetings_lock:
         for call_id in list(active_meetings.keys()):
             logger.info(f"🧹 Cleaning up meeting: {call_id}")
 
 
-# Create FastAPI app
 app = FastAPI(
     title="Meeting Assistant API",
     description="Optimized API for managing AI meeting assistant agents",
@@ -423,13 +596,12 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS middleware with security improvements
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
         "http://localhost:3001",
-        "https://hraiclient.vercel.app"  # Add your production domain
+        "https://hraiclient.vercel.app"
     ],
     allow_credentials=True,
     allow_methods=["GET", "POST", "DELETE"],
@@ -439,7 +611,6 @@ app.add_middleware(
 
 @app.get("/")
 async def root():
-    """Root endpoint"""
     return {
         "message": "Meeting Assistant API - Optimized",
         "version": "2.0.0",
@@ -458,7 +629,6 @@ async def root():
 
 @app.get("/health", response_model=HealthStatus)
 async def health_check():
-    """Health check endpoint with detailed stats"""
     async with meetings_lock:
         active_count = len([m for m in active_meetings.values() if m.get("is_active", False)])
         total_count = len(active_meetings)
@@ -475,70 +645,80 @@ async def health_check():
 async def start_meeting(request: StartMeetingRequest, background_tasks: BackgroundTasks):
     """
     Start a new meeting assistant agent
-    
-    Optimizations:
-    - Prevents duplicate active meetings
-    - Uses OpenAI for better stability
-    - Implements stall detection
-    - Thread-safe operations
+    Routes to active or passive agent based on agent_type
     """
     
-    # ✅ Validate environment variables
     if not os.getenv("STREAM_API_KEY"):
         raise HTTPException(status_code=500, detail="STREAM_API_KEY not configured")
     if not os.getenv("OPENAI_API_KEY"):
         raise HTTPException(status_code=500, detail="OPENAI_API_KEY not configured")
     
-    # ✅ PREVENT DUPLICATES with thread-safe check
+    if request.agent_type not in ["active", "passive"]:
+        raise HTTPException(
+            status_code=400, 
+            detail="agent_type must be 'active' or 'passive'"
+        )
+    
     async with meetings_lock:
         if request.call_id in active_meetings:
             existing = active_meetings[request.call_id]
             
-            # If already active, reject
             if existing.get("is_active", False):
-                logger.warning(f"⚠️ DUPLICATE REQUEST BLOCKED: Meeting {request.call_id} is already active")
+                logger.warning(f"⚠️ DUPLICATE: Meeting {request.call_id} already active")
                 raise HTTPException(
                     status_code=409, 
-                    detail=f"Meeting {request.call_id} is already active. Stop it first or use a different call_id."
+                    detail=f"Meeting {request.call_id} is already active"
                 )
             
-            # If inactive, allow restart
             logger.info(f"♻️ Restarting inactive meeting: {request.call_id}")
         
-        # Mark as "starting" IMMEDIATELY to prevent race conditions
         active_meetings[request.call_id] = {
             "transcript": [],
-            "is_active": True,  # Set to True IMMEDIATELY
+            "is_active": True,
             "started_at": datetime.now().isoformat(),
             "last_activity": datetime.now().isoformat(),
             "agent": None,
             "channel": None,
             "agent_name": request.agent_name,
-            "agent_id": request.agent_id
+            "agent_id": request.agent_id,
+            "agent_type": request.agent_type
         }
     
-    logger.info(f"✅ START REQUEST ACCEPTED for call_id: {request.call_id}")
+    logger.info(f"✅ START REQUEST ACCEPTED")
+    logger.info(f"   Call ID: {request.call_id}")
+    logger.info(f"   Agent: {request.agent_name}")
+    logger.info(f"   Type: {request.agent_type.upper()}")
     
-    # Start agent in background
-    background_tasks.add_task(
-        run_agent, 
-        request.call_id, 
-        request.agent_name or "AI Meeting Assistant",
-        request.agent_instructions or "You are a helpful AI meeting assistant.",
-        request.agent_id
-    )
+    # 🔥 CONDITIONAL: Call appropriate function based on type
+    if request.agent_type == "active":
+        logger.info(f"🎙️ Starting ACTIVE agent")
+        background_tasks.add_task(
+            run_agent,
+            request.call_id,
+            request.agent_name or "AI Meeting Assistant",
+            request.agent_instructions or "You are a helpful AI meeting assistant.",
+            request.agent_id
+        )
+    elif request.agent_type == "passive":
+        logger.info(f"📝 Starting PASSIVE agent")
+        background_tasks.add_task(
+            run_passive_agent,
+            request.call_id,
+            request.agent_name or "AI Meeting Assistant",
+            request.agent_instructions or "You are a helpful AI meeting assistant.",
+            request.agent_id
+        )
     
     return MeetingResponse(
         success=True,
         call_id=request.call_id,
-        message=f"Meeting assistant started for call: {request.call_id}",
+        message=f"{request.agent_type.capitalize()} agent started for call: {request.call_id}",
         timestamp=datetime.now().isoformat()
     )
 
 
 @app.get("/meetings/{call_id}/status", response_model=MeetingStatus)
 async def get_meeting_status(call_id: str):
-    """Get the status of a meeting with detailed information"""
     meeting = await get_meeting_data(call_id)
     
     if not meeting:
@@ -556,18 +736,6 @@ async def get_meeting_status(call_id: str):
 
 @app.get("/meetings/{call_id}/transcript", response_model=TranscriptResponse)
 async def get_transcript(call_id: str, limit: Optional[int] = None):
-    """
-    Get the transcript for a meeting
-    
-    Returns transcript in format compatible with UI:
-    - speaker: will be renamed to speaker_id by webhook
-    - text: the transcript text
-    - timestamp: ISO format, will be converted to start_ts/end_ts by webhook
-    - type: 'user' or 'agent'
-    
-    Args:
-        limit: Optional limit on number of transcript entries to return (most recent)
-    """
     meeting = await get_meeting_data(call_id)
     
     if not meeting:
@@ -575,7 +743,6 @@ async def get_transcript(call_id: str, limit: Optional[int] = None):
     
     transcript = meeting.get("transcript", [])
     
-    # Apply limit if specified
     if limit and limit > 0:
         transcript = transcript[-limit:]
     
@@ -588,7 +755,6 @@ async def get_transcript(call_id: str, limit: Optional[int] = None):
 
 @app.post("/meetings/{call_id}/stop")
 async def stop_meeting(call_id: str):
-    """Stop a meeting gracefully"""
     meeting = await get_meeting_data(call_id)
     
     if not meeting:
@@ -605,7 +771,6 @@ async def stop_meeting(call_id: str):
             }
         )
     
-    # Mark as inactive (agent will cleanup)
     await update_meeting_data(call_id, {
         "is_active": False,
         "stopped_at": datetime.now().isoformat()
@@ -623,12 +788,6 @@ async def stop_meeting(call_id: str):
 
 @app.get("/meetings")
 async def list_meetings(active_only: bool = False):
-    """
-    List all meetings
-    
-    Args:
-        active_only: If True, only return active meetings
-    """
     meetings = []
     
     async with meetings_lock:
@@ -657,12 +816,6 @@ async def list_meetings(active_only: bool = False):
 
 @app.delete("/meetings/{call_id}")
 async def delete_meeting(call_id: str, force: bool = False):
-    """
-    Delete a meeting and its data
-    
-    Args:
-        force: If True, delete even if meeting is active (not recommended)
-    """
     meeting = await get_meeting_data(call_id)
     
     if not meeting:
@@ -695,7 +848,6 @@ if __name__ == "__main__":
     
     logger.info(f"🚀 Starting server on {host}:{port}")
     
-    # Production-ready configuration
     uvicorn.run(
         app, 
         host=host, 

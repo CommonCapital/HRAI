@@ -455,7 +455,7 @@ NOW RESPOND WITH THIS JSON STRUCTURE (replace ALL example values with ACTUAL dat
   },
   
   "experienceMatch": {
-    "score": 7
+    "score": (number from 0 to 10)
   },
   
   "skills": {
@@ -525,7 +525,7 @@ NOW RESPOND WITH THIS JSON STRUCTURE (replace ALL example values with ACTUAL dat
   },
   
   "roleAlignment": {
-    "score": 7,
+    "score": (number from 0 to 10),
     "hiringRecommendation": "Recommend technical interview to assess...",
     "requirementsAssessment": "Candidate meets X out of Y core requirements",
     "criticalGaps": ["Leadership experience", "Cloud infrastructure hands-on"],
@@ -542,7 +542,7 @@ NOW RESPOND WITH THIS JSON STRUCTURE (replace ALL example values with ACTUAL dat
     
     "skillsMatch": {
       "matches": true,
-      "matchPercentage": 80,
+      "matchPercentage": ( number from 0 to 100),
       "reasoning": "8/10 required skills present"
     },
     
@@ -553,7 +553,7 @@ NOW RESPOND WITH THIS JSON STRUCTURE (replace ALL example values with ACTUAL dat
     },
     
     "culturalFit": {
-      "score": 7,
+      "score": ( number from 0 to 10 ),
       "assessment": "Assessment based on CV content"
     },
     
@@ -629,13 +629,13 @@ NOW RESPOND WITH THIS JSON STRUCTURE (replace ALL example values with ACTUAL dat
   ],
   
   "missingCriticalInfo": [],
-  "completenessScore": 85,
+  "completenessScore": (number from 0 to 100),
   
   "recommendation": "Interview",
   "summary": "Strong backend engineer with 6 years experience in Python/Django. Meets most requirements but needs interview to validate cloud experience. Recommend proceeding with technical interview.",
-  "overallScore": 78 ( The candidate score is computed as follows: 
+  "overallScore": (number from 0 to 100) ( The candidate score is computed as follows: 
 Score=(roleScore×10×0.4)+(experienceScore×10×0.4)+(completeness×0.2)
-It is not predetermined (e.g., 78); if the formula produces no value, the score defaults to 50. )
+
 }
 
 ⚠️⚠️⚠️ CRITICAL: The JSON above shows EXAMPLE DATA only! ⚠️⚠️⚠️

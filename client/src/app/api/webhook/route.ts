@@ -10,7 +10,7 @@ import { GeneratdAvatarUri } from "@/lib/avatar";
 import {and, eq, not} from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { agents, meetings, processedWebhooks } from "@/db/schema";
+import { agents, cvAnalysis, meetings, processedWebhooks } from "@/db/schema";
 import {streamVideo} from "@/lib/stream-video";
 import { inngest } from "@/inngest/client";
 import OpenAI from "openai";
@@ -54,7 +54,8 @@ export async function POST(req: NextRequest) {
     };
 
     const eventType = (payload as Record<string, unknown>)?.type;
-if (eventType === "call.session_started") {
+
+    if (eventType === "call.session_started") {
     const event = payload as CallSessionStartedEvent;
     const meetingId = event.call.custom?.meetingId;
 
@@ -74,9 +75,8 @@ if (eventType === "call.session_started") {
             not(eq(meetings.status, "cancelled")),
             not(eq(meetings.status, "processing"))
         )
-    ).returning();  // ← Returns affected rows
+    ).returning();
 
-    // If no rows updated, meeting was already active or doesn't exist
     if (updateResult.length === 0) {
         console.log(`⚠️ Meeting ${meetingId} already active or not found - ignoring duplicate webhook`);
         return NextResponse.json({status: "Already active"}, {status: 200});
@@ -84,7 +84,7 @@ if (eventType === "call.session_started") {
 
     const existingMeeting = updateResult[0];
 
-    // Now fetch agent and start AI agent
+    // Fetch agent WITH agentType
     const [existingAgent] = await db.select().from(agents).where(
         eq(agents.id, existingMeeting.agentId)
     );
@@ -93,13 +93,156 @@ if (eventType === "call.session_started") {
         return NextResponse.json({error: "Agent not found"}, {status: 404})
     };
 
-    // Rest of your code...
-    const instructions = typeof existingAgent.instructions === "string"
+    console.log(`📊 Agent Details:`);
+    console.log(`   Name: ${existingAgent.name}`);
+    console.log(`   Type: ${existingAgent.agentType}`);
+    console.log(`   ID: ${existingAgent.id}`);
+
+    // ✅ Base instructions from agent
+    let instructions = typeof existingAgent.instructions === "string"
         ? existingAgent.instructions
-        : "You are a rational and critical Venture Capitalist analyst...";
+        : "You are a rational and critical HR Interviewer...";
+
+    // 🆕 If PASSIVE agent, prepend silence instructions
+    if (existingAgent.agentType === 'passive') {
+        console.log(`📝 Agent is PASSIVE - prepending silence instructions`);
+        
+        const passivePrefix = `
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔇 PASSIVE ASSISTANT MODE - CRITICAL INSTRUCTIONS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+You are "${existingAgent.name}", a PASSIVE meeting assistant.
+
+🚨 CRITICAL RULES - FOLLOW EXACTLY:
+
+1. YOU MUST STAY COMPLETELY SILENT unless explicitly addressed
+2. You are addressed when someone says:
+   - "${existingAgent.name}" (your exact name)
+   - "AI" (the word AI)
+3. DO NOT respond to general conversation between participants
+4. DO NOT acknowledge anything participants say to each other
+5. DO NOT interrupt or volunteer information
+6. DO NOT explain that you're staying silent
+7. If unsure whether to speak: DON'T SPEAK
+
+📋 Your ONLY Job:
+- Listen to everything silently
+- Take comprehensive notes
+- Wait patiently for explicit questions
+- Transcribe all conversations
+
+💬 When You ARE Triggered (by name or "AI"):
+- Answer the question concisely
+- Base your answer ONLY on meeting context
+- Be professional and helpful
+- Return to complete silence immediately after
+
+❌ NEVER DO:
+- "I'm here to help!" (unprompted)
+- "Let me know if you need anything" (unprompted)
+- Respond to "What do you think?" (not addressing you)
+- Acknowledge side conversations
+
+✅ ONLY RESPOND TO:
+- "Hey ${existingAgent.name}, what are the action items?"
+- "AI, can you summarize what we discussed?"
+- "${existingAgent.name}, did anyone mention the budget?"
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+`;
+        
+        instructions = passivePrefix + "\n\n" + instructions;
+        console.log(`✅ Passive instructions prepended (${passivePrefix.length} chars)`);
+    } else {
+        console.log(`🎙️ Agent is ACTIVE - no silence instructions needed`);
+    }
+
+    // ✅ If meeting has a linked CV analysis, inject it as HR interview context
+    if (existingMeeting.cvAnalysisId) {
+        console.log(`📋 Meeting has CV analysis linked: ${existingMeeting.cvAnalysisId}`);
+
+        const [cv] = await db
+            .select()
+            .from(cvAnalysis)
+            .where(eq(cvAnalysis.id, existingMeeting.cvAnalysisId));
+
+        if (cv) {
+            console.log(`✅ CV analysis found for candidate: ${cv.candidateName}`);
+
+            // Build a structured, readable context block for the AI
+            const cvContext = `
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📋 HR INTERVIEW CONTEXT — CANDIDATE CV ANALYSIS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+${existingAgent.agentType === 'active' 
+    ? 'You are conducting an HR interview. The candidate has submitted a CV that has been pre-analyzed.' 
+    : 'When asked about the candidate, reference this pre-analyzed CV data.'}
+
+Use the data below to:
+${existingAgent.agentType === 'active' 
+    ? `1. Ask informed, targeted follow-up questions based on the candidate's background
+2. Probe any gaps, short tenures, or unclear transitions in their work history
+3. Identify and gently challenge any inconsistencies between what the candidate says and their CV
+4. Reference the suggested interview focus areas when steering the conversation` 
+    : `1. Answer questions about the candidate's background accurately
+2. Provide context from their CV when asked
+3. Highlight relevant strengths and concerns when queried
+4. Reference specific data points from the analysis`}
+
+--- CANDIDATE OVERVIEW ---
+Name: ${cv.candidateName ?? "Unknown"}
+Current Role: ${cv.currentRole ?? "Unknown"}
+Industry: ${cv.industry ?? "Unknown"}
+Overall Score: ${cv.overallScore}/100
+Recommendation: ${cv.recommendation}
+Summary: ${cv.summary}
+
+--- ROLE ALIGNMENT ---
+${JSON.stringify(cv.roleAlignment, null, 2)}
+
+--- WORK HISTORY ---
+${JSON.stringify(cv.workHistory, null, 2)}
+
+--- SKILLS ---
+${JSON.stringify(cv.skills, null, 2)}
+
+--- EDUCATION ---
+${JSON.stringify(cv.education, null, 2)}
+
+--- RED FLAGS ---
+${JSON.stringify(cv.redFlags, null, 2)}
+
+--- CAREER TRAJECTORY ---
+${JSON.stringify(cv.careerTrajectory, null, 2)}
+
+--- NEXT STEPS & INTERVIEW FOCUS ---
+${JSON.stringify(cv.nextSteps, null, 2)}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${existingAgent.agentType === 'active' 
+    ? 'Begin the interview naturally. Do not reveal internal scoring or red flags directly — use them to guide your questions.' 
+    : 'When asked, provide insights based on this data. Do not volunteer this information unprompted.'}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+`;
+
+            instructions = instructions + "\n\n" + cvContext;
+            console.log(`✅ CV context injected into agent instructions (${cvContext.length} chars)`);
+        } else {
+            console.warn(`⚠️ CV analysis ${existingMeeting.cvAnalysisId} not found in DB — proceeding without context`);
+        }
+    } else {
+        console.log(`ℹ️ No CV analysis linked to this meeting — standard agent instructions used`);
+    }
 
     try {
         console.log(`🚀 Starting AI agent via FastAPI for meeting: ${meetingId}`);
+        console.log(`   Agent Name: ${existingAgent.name}`);
+        console.log(`   Agent Type: ${existingAgent.agentType}`);
+        console.log(`   Agent ID: ${existingAgent.id}`);
+        console.log(`   CV Context: ${existingMeeting.cvAnalysisId ? '✅ Included' : '❌ Not included'}`);
+        console.log(`   Instructions Length: ${instructions.length} chars`);
         
         const response = await fetch(`${FASTAPI_URL}/meetings/start`, {
             method: 'POST',
@@ -109,42 +252,42 @@ if (eventType === "call.session_started") {
             body: JSON.stringify({
                 call_id: meetingId,
                 agent_name: existingAgent.name,
-                agent_instructions: instructions,
+                agent_type: existingAgent.agentType,    // 🆕 NEW: Send agent type
+                agent_instructions: instructions,        // Includes passive prefix + CV context
                 agent_id: existingAgent.id
             }),
         });
 
-            if (!response.ok) {
-                const error = await response.json();
-                console.error('Failed to start AI agent:', error);
-                return NextResponse.json({
-                    error: `Failed to start AI agent: ${error.detail || 'Unknown error'}`
-                }, {status: 500});
-            }
-
-            const data = await response.json();
-            console.log(`✅ AI agent started successfully:`, data);
-
-            // Initialize chat channel for post-meeting Q&A
-            try {
-                const channel = streamChat.channel("messaging", meetingId, {
-                    created_by_id: existingAgent.id,
-                    members: [existingAgent.id],
-                });
-                await channel.watch();
-                console.log("✅ Chat channel initialized");
-            } catch (error) {
-                console.error("Failed to initialize chat channel:", error);
-            }
-
-        } catch (error) {
-            console.error('Error calling FastAPI backend:', error);
+        if (!response.ok) {
+            const error = await response.json();
+            console.error('Failed to start AI agent:', error);
             return NextResponse.json({
-                error: `Failed to start AI agent: ${error instanceof Error ? error.message : 'Unknown error'}`
+                error: `Failed to start AI agent: ${error.detail || 'Unknown error'}`
             }, {status: 500});
         }
 
-    } else if (eventType === "call.session_participant_left") {
+        const data = await response.json();
+        console.log(`✅ ${existingAgent.agentType.toUpperCase()} agent started successfully`);
+
+        // Initialize chat channel for post-meeting Q&A
+        try {
+            const channel = streamChat.channel("messaging", meetingId, {
+                created_by_id: existingAgent.id,
+                members: [existingAgent.id],
+            });
+            await channel.watch();
+            console.log("✅ Chat channel initialized");
+        } catch (error) {
+            console.error("Failed to initialize chat channel:", error);
+        }
+
+    } catch (error) {
+        console.error('Error calling FastAPI backend:', error);
+        return NextResponse.json({
+            error: `Failed to start AI agent: ${error instanceof Error ? error.message : 'Unknown error'}`
+        }, {status: 500});
+    }
+} else if (eventType === "call.session_participant_left") {
         const event = payload as CallSessionParticipantLeftEvent;
         const meetingId = event.call_cid.split(":")[1];
 
@@ -152,113 +295,103 @@ if (eventType === "call.session_started") {
             return NextResponse.json({error: "Missing meetingID"}, {status: 400});
         }
 
-    // WEBHOOK HANDLER FIX - Replace your current "call.session_ended" handler
+    } else if (eventType === "call.session_ended") {
+        const event = payload as CallEndedEvent;
+        const meetingId = event.call.custom?.meetingId;
 
-} else if (eventType === "call.session_ended") {
-    const event = payload as CallEndedEvent;
-    const meetingId = event.call.custom?.meetingId;
+        if (!meetingId) {
+            return NextResponse.json({error: "Missing meetingId"}, {status: 400});
+        }
 
-    if (!meetingId) {
-        return NextResponse.json({error: "Missing meetingId"}, {status: 400});
-    }
+        let transcriptData: any = null;
+        let transformedTranscript: any[] = [];
 
-    // 🔥 GET TRANSCRIPT FROM FASTAPI BEFORE STOPPING
-    let transcriptData: any = null;
-    let transformedTranscript: any[] = [];
-
-    try {
-        console.log(`📝 Fetching transcript from FastAPI for meeting: ${meetingId}`);
-        
-        const transcriptResponse = await fetch(
-            `${FASTAPI_URL}/meetings/${meetingId}/transcript`,
-            { method: 'GET' }
-        );
-
-        if (transcriptResponse.ok) {
-            transcriptData = await transcriptResponse.json();
-            console.log(`✅ Retrieved ${transcriptData.total_entries} transcript entries from FastAPI`);
-            console.log(`✅Transcript: ${transcriptData.transcript}`);
-            // ✅ TRANSFORM to match UI expectations (StreamTranscriptItem format)
-            transformedTranscript = transcriptData.transcript.map((entry: any, index: number) => {
-                const timestamp = new Date(entry.timestamp);
-                const startMs = timestamp.getTime();
-                
-                return {
-                    speaker_id: entry.speaker,           // ✅ Rename "speaker" to "speaker_id"
-                    text: entry.text,
-                    start_ts: startMs,                   // ✅ Convert ISO timestamp to milliseconds
-                    end_ts: startMs + 1000,              // Estimate 1 second duration
-                    type: entry.type || 'user'
-                };
-            });
+        try {
+            console.log(`📝 Fetching transcript from FastAPI for meeting: ${meetingId}`);
             
-            console.log(`✅ Transformed ${transformedTranscript.length} transcript entries`);
-             console.log(`✅Transcript: ${transformedTranscript}`);
-        } else {
-            console.warn(`⚠️ Failed to fetch transcript from FastAPI`);
+            const transcriptResponse = await fetch(
+                `${FASTAPI_URL}/meetings/${meetingId}/transcript`,
+                { method: 'GET' }
+            );
+
+            if (transcriptResponse.ok) {
+                transcriptData = await transcriptResponse.json();
+                console.log(`✅ Retrieved ${transcriptData.total_entries} transcript entries from FastAPI`);
+
+                transformedTranscript = transcriptData.transcript.map((entry: any, index: number) => {
+                    const timestamp = new Date(entry.timestamp);
+                    const startMs = timestamp.getTime();
+                    
+                    return {
+                        speaker_id: entry.speaker,
+                        text: entry.text,
+                        start_ts: startMs,
+                        end_ts: startMs + 1000,
+                        type: entry.type || 'user'
+                    };
+                });
+                
+                console.log(`✅ Transformed ${transformedTranscript.length} transcript entries`);
+            } else {
+                console.warn(`⚠️ Failed to fetch transcript from FastAPI`);
+            }
+        } catch (error) {
+            console.error('❌ Error fetching transcript from FastAPI:', error);
         }
-    } catch (error) {
-        console.error('❌ Error fetching transcript from FastAPI:', error);
-    }
 
-    // 🔥 STOP THE AI AGENT
-    try {
-        console.log(`🛑 Stopping AI agent for meeting: ${meetingId}`);
-        
-        const response = await fetch(`${FASTAPI_URL}/meetings/${meetingId}/stop`, {
-            method: 'POST',
-        });
+        try {
+            console.log(`🛑 Stopping AI agent for meeting: ${meetingId}`);
+            
+            const response = await fetch(`${FASTAPI_URL}/meetings/${meetingId}/stop`, {
+                method: 'POST',
+            });
 
-        if (response.ok) {
-            const data = await response.json();
-            console.log(`✅ AI agent stopped:`, data);
-        } else {
-            console.warn('⚠️ Failed to stop AI agent, it may have already stopped');
+            if (response.ok) {
+                const data = await response.json();
+                console.log(`✅ AI agent stopped:`, data);
+            } else {
+                console.warn('⚠️ Failed to stop AI agent, it may have already stopped');
+            }
+        } catch (error) {
+            console.error('❌ Error stopping AI agent:', error);
         }
-    } catch (error) {
-        console.error('❌ Error stopping AI agent:', error);
-    }
 
-    // 🔥 UPDATE DATABASE WITH TRANSFORMED TRANSCRIPT
-    await db.update(meetings).set({
-        status: "processing", 
-        endedAt: new Date(),
-        transcriptUrl: transformedTranscript.length > 0 
-            ? JSON.stringify(transformedTranscript)  // ✅ Store TRANSFORMED format
-            : null
-    }).where(
-        and(
-            eq(meetings.id, meetingId), 
-            eq(meetings.status, "active")
-        )
-    );
-    console.log("✅ Meeting status updated to processing with transformed transcript");
+        await db.update(meetings).set({
+            status: "processing", 
+            endedAt: new Date(),
+            transcriptUrl: transformedTranscript.length > 0 
+                ? JSON.stringify(transformedTranscript)
+                : null
+        }).where(
+            and(
+                eq(meetings.id, meetingId), 
+                eq(meetings.status, "active")
+            )
+        );
+        console.log("✅ Meeting status updated to processing with transformed transcript");
 
-    // 🔥 SEND TO INNGEST WITH TRANSFORMED TRANSCRIPT
-    try {
-        console.log("🔁 Sending to Inngest with transformed transcript data...");
-        
-        await inngest.send({
-            name: "meetings/processing",
-            data: {
-                meetingId: meetingId,
-                transcript: transformedTranscript,  // ✅ Use transformed format
-                transcriptText: JSON.stringify(transformedTranscript),
-                transcriptEntries: transformedTranscript.length
-            },
-        }); 
-        
-        console.log("✅ Inngest function triggered successfully with transformed transcript");
-    } catch (error) {
-        console.error("❌ Failed to trigger Inngest function:", error);
-    }
-} else if (eventType === "call.transcription_ready") {
+        try {
+            console.log("🔁 Sending to Inngest with transformed transcript data...");
+            
+            await inngest.send({
+                name: "meetings/processing",
+                data: {
+                    meetingId: meetingId,
+                    transcript: transformedTranscript,
+                    transcriptText: JSON.stringify(transformedTranscript),
+                    transcriptEntries: transformedTranscript.length
+                },
+            }); 
+            
+            console.log("✅ Inngest function triggered successfully with transformed transcript");
+        } catch (error) {
+            console.error("❌ Failed to trigger Inngest function:", error);
+        }
+
+    } else if (eventType === "call.transcription_ready") {
         console.log("📝 Stream transcription is ready (may be empty if using Gemini)");
         const event = payload as CallTranscriptionReadyEvent;
         const meetingId = event.call_cid.split(":")[1];
-
-        // This event still fires but Stream's transcript will be empty
-        // We're using Gemini's transcript instead
         console.log("Stream transcript URL:", event.call_transcription);
 
     } else if (eventType === "call.recording_ready") {
@@ -277,7 +410,8 @@ if (eventType === "call.session_started") {
         const userId = event.user?.id;
         const channelId = event.channel_id;
         const text = event.message?.text;
- const messageId = event.message?.id;
+        const messageId = event.message?.id;
+
         if (!userId || !channelId || !text) {
             return NextResponse.json(
                 {error: "Missing userId, channelId or text"},
@@ -303,23 +437,22 @@ if (eventType === "call.session_started") {
         if (!existingAgent) {
             return NextResponse.json({error: "Agent not found"}, {status:404});
         }
+
         if (!messageId) return NextResponse.json({status: "No message ID"});
     
-    // ✅ CHECK: Have we processed this message already?
-    const [existing] = await db.select()
-        .from(processedWebhooks)
-        .where(eq(processedWebhooks.webhookId, messageId));
-    
-    if (existing) {
-        console.log(`⚠️ Duplicate webhook for message ${messageId} - ignoring`);
-        return NextResponse.json({status: "Already processed"});
-    }
-    
-    // ✅ MARK as processing IMMEDIATELY (atomic operation)
-    await db.insert(processedWebhooks).values({
-        webhookId: messageId,
-        eventType: "message.new",
-    });
+        const [existing] = await db.select()
+            .from(processedWebhooks)
+            .where(eq(processedWebhooks.webhookId, messageId));
+        
+        if (existing) {
+            console.log(`⚠️ Duplicate webhook for message ${messageId} - ignoring`);
+            return NextResponse.json({status: "Already processed"});
+        }
+        
+        await db.insert(processedWebhooks).values({
+            webhookId: messageId,
+            eventType: "message.new",
+        });
 
         if (userId !== existingAgent.id) {
             const instructions = `
@@ -353,7 +486,7 @@ Be concise, helpful, and focus on providing accurate information from the meetin
 
             try {
                 const chatCompletion = await openai.chat.completions.create({
-                    model: "chatgpt-4o-latest",
+                    model: "gpt-4o",
                     messages: [
                         { role: "system", content: instructions },
                         ...previousMessages,

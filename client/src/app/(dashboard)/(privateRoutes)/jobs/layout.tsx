@@ -16,7 +16,7 @@ const Layout = async ({children}:Props) => {
               headers: await headers(),
             });
           
-            if (!session && session!.user.email !== "collin@musedata.ai" || !session && session!.user.email !== "nursan2007@gmail.com" || !session && session!.user.email !== "partners@musedata.ai" || !session && session!.user.email !== "nursanomarov616@gmail.com" ) {
+            if (!session) {
               redirect("/auth/sign-in");
             }
     
