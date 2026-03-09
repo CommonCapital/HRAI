@@ -6,7 +6,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { useTRPC } from "@/trpc/client";
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
-import { Check, Copy, ExternalLink, PlusCircle, Users, Zap, ZapOff } from "lucide-react";
+import { Brain, Check, ChevronDown, Copy, ExternalLink, PlusCircle, Sparkles, Users, Zap, ZapOff } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { CommandSelect } from "@/components/command-select";
@@ -15,6 +15,22 @@ import { GeneratedAvatar } from "@/components/generated-avatar";
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type RightPanel = "create" | "detail" | "created";
+
+type MatchResult = {
+  applicationId:     string;
+  candidateName:     string;
+  currentRole:       string | null;
+  experienceYears:   string | null;   // "0-1" | "1-3" | "3-5" | "5-10" | "10+"
+  location:          string | null;
+  skills:            string;          // free-text string from the application form
+  score:             number;
+  recommendation:    string;
+  explanation:       string;
+  strengths:         string[];
+  gaps:              string[];
+  applicationStatus: string;
+};
+
 
 type JobFormValues = {
   title:             string;
@@ -54,13 +70,28 @@ export function JobsView() {
   const router      = useRouter();
   const trpc        = useTRPC();
   const queryClient = useQueryClient();
-
+const EXP_LABELS: Record<string, string> = {
+  "0-1":  "0–1 yrs",
+  "1-3":  "1–3 yrs",
+  "3-5":  "3–5 yrs",
+  "5-10": "5–10 yrs",
+  "10+":  "10+ yrs",
+};
   const [showClosed,    setShowClosed]    = useState(false);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [rightPanel,    setRightPanel]    = useState<RightPanel>("create");
   const [feedback,      setFeedback]      = useState<string | null>(null);
   const [pendingId,     setPendingId]     = useState<string | null>(null);
   const [agentSearch,   setAgentSearch]   = useState("");
+
+  // AI auto-fill state
+  const [autoFilling, setAutoFilling] = useState(false);
+
+  // AI match state
+  const [matchLoading,  setMatchLoading]  = useState(false);
+  const [matchData,     setMatchData]     = useState<MatchResult[] | null>(null);
+  const [matchJobId,    setMatchJobId]    = useState<string | null>(null);
+  const [matchExpanded, setMatchExpanded] = useState(true);
 
   // After-creation state
   const [createdJobId,       setCreatedJobId]       = useState<string | null>(null);
@@ -129,6 +160,49 @@ export function JobsView() {
       onError: (e) => { setFeedback(e.message); setPendingId(null); },
     }),
   );
+
+  // ── AI auto-fill ──────────────────────────────────────────────────────────
+  const autoFillMutation = useMutation(trpc.jobs.autoFill.mutationOptions());
+
+  async function handleAutoFill() {
+    const title = form.getValues("title").trim();
+    if (!title) { setFeedback("Enter a job title first to use AI fill."); return; }
+    setAutoFilling(true);
+    setFeedback(null);
+    try {
+      const data = await autoFillMutation.mutateAsync({ title });
+      form.setValue("description",    data.description);
+      form.setValue("location",       data.location);
+      form.setValue("employmentType", data.employmentType);
+      form.setValue("workplaceType",  data.workplaceType);
+      form.setValue("salaryCurrency", data.salaryCurrency);
+      form.setValue("tags",           data.tags.join(", "));
+      if (data.salaryMin) form.setValue("salaryMin", String(data.salaryMin));
+      if (data.salaryMax) form.setValue("salaryMax", String(data.salaryMax));
+    } catch (e: any) {
+      setFeedback(`AI fill failed: ${e.message}`);
+    } finally {
+      setAutoFilling(false);
+    }
+  }
+
+  // ── AI candidate matching ─────────────────────────────────────────────────
+  const matchMutation = useMutation(trpc.jobs.matchCandidates.mutationOptions());
+
+  async function handleMatch(jobId: string) {
+    setMatchLoading(true);
+    setMatchData(null);
+    setMatchJobId(jobId);
+    setMatchExpanded(true);
+    try {
+      const result = await matchMutation.mutateAsync({ jobId });
+      setMatchData(result.matches as MatchResult[]);
+    } catch (e: any) {
+      setFeedback(`Match failed: ${e.message}`);
+    } finally {
+      setMatchLoading(false);
+    }
+  }
 
   // ── Create form ───────────────────────────────────────────────────────────
   const form = useForm<JobFormValues>({ defaultValues: DEFAULT_FORM });
@@ -223,7 +297,7 @@ export function JobsView() {
                   <button
                     key={job.id}
                     className={`crm-list-item ${isSelected ? "crm-list-item--selected" : ""} ${!job.isActive ? "crm-list-item--closed" : ""}`}
-                    onClick={() => { setSelectedJobId(job.id); setRightPanel("detail"); setFeedback(null); }}
+                    onClick={() => { setSelectedJobId(job.id); setRightPanel("detail"); setFeedback(null); if (matchJobId !== job.id) { setMatchData(null); setMatchJobId(null); } }}
                   >
                     <div className="crm-item-top">
                       <span className="crm-item-title">{job.title}</span>
@@ -346,6 +420,14 @@ export function JobsView() {
                     <Users size={14} strokeWidth={1.5} className="mr-1 inline" />
                     Applicants ({selectedJob.applicationCount})
                   </button>
+                  <button
+                    className="crm-match-btn"
+                    disabled={matchLoading && matchJobId === selectedJob.id}
+                    onClick={() => handleMatch(selectedJob.id)}
+                  >
+                    <Brain size={14} strokeWidth={1.5} className="mr-1 inline" />
+                    {matchLoading && matchJobId === selectedJob.id ? "Matching…" : "AI Match"}
+                  </button>
                 </div>
               </div>
 
@@ -367,6 +449,88 @@ export function JobsView() {
                   <span className="crm-metric-label">Posted</span>
                 </div>
               </div>
+
+              {/* ── AI Match Results ──────────────────────────────────── */}
+              {(matchLoading && matchJobId === selectedJob.id) || (matchData && matchJobId === selectedJob.id) ? (
+                <div className="crm-match-panel">
+                  <button
+                    className="crm-match-panel-header"
+                    onClick={() => setMatchExpanded((v) => !v)}
+                  >
+                    <span className="crm-match-panel-title">
+                      <Brain size={14} className="inline mr-2 text-orange-500" />
+                      AI Candidate Ranking
+                      {matchData && (
+                        <span className="crm-match-count">{matchData.length} candidates</span>
+                      )}
+                    </span>
+                    <ChevronDown
+                      size={14}
+                      className={`crm-match-chevron ${matchExpanded ? "crm-match-chevron--open" : ""}`}
+                    />
+                  </button>
+
+                  {matchExpanded && (
+                    <div className="crm-match-body">
+                      {matchLoading ? (
+                        <div className="crm-match-loading">
+                          <span className="crm-match-spinner" />
+                          Analyzing {selectedJob.applicationCount} candidates against job requirements…
+                        </div>
+                      ) : matchData && matchData.length === 0 ? (
+                        <p className="crm-match-empty">No applications yet to rank.</p>
+                      ) : (
+                        <div className="crm-match-list">
+                          {matchData?.map((m, idx) => (
+                            <div key={m.applicationId} className="crm-match-card">
+  <div className="crm-match-rank">#{idx + 1}</div>
+  <div className="crm-match-info">
+    <div className="crm-match-top">
+      <span className="crm-match-name">{m.candidateName}</span>
+      {m.currentRole && (
+        <span className="crm-match-role">{m.currentRole}</span>
+      )}
+      {m.experienceYears && (
+        <span className="crm-match-exp">{EXP_LABELS[m.experienceYears] ?? m.experienceYears}</span>
+      )}
+      <span className={`crm-match-rec crm-match-rec--${m.recommendation.toLowerCase().replace(" ", "-")}`}>
+        {m.recommendation}
+      </span>
+    </div>
+    <p className="crm-match-explanation">{m.explanation}</p>
+    {(m.strengths.length > 0 || m.gaps.length > 0) && (
+      <div className="crm-match-tags-row">
+        {m.strengths.map((s) => (
+          <span key={s} className="crm-match-tag crm-match-tag--strength">✓ {s}</span>
+        ))}
+        {m.gaps.map((g) => (
+          <span key={g} className="crm-match-tag crm-match-tag--gap">✗ {g}</span>
+        ))}
+      </div>
+    )}
+  </div>
+  <div className="crm-match-score-wrap">
+    <svg viewBox="0 0 36 36" className="crm-match-score-ring">
+      <circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(255,106,0,0.1)" strokeWidth="3" />
+      <circle
+        cx="18" cy="18" r="15.9" fill="none"
+        stroke={m.score >= 70 ? "#FF6A00" : m.score >= 50 ? "#f97316" : "rgba(255,106,0,0.3)"}
+        strokeWidth="3"
+        strokeDasharray={`${m.score} 100`}
+        strokeLinecap="round"
+        transform="rotate(-90 18 18)"
+      />
+    </svg>
+    <span className="crm-match-score-num">{m.score}</span>
+  </div>
+</div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ) : null}
 
               {/* Apply link */}
               <div className="crm-detail-section">
@@ -476,8 +640,20 @@ export function JobsView() {
 
                 <CrmSection num="01" title="The Role">
                   <CrmField label="Job title" required error={form.formState.errors.title?.message}>
-                    <input className="crm-input" placeholder="e.g. Senior Product Designer"
-                      {...form.register("title", { required: "Required." })} />
+                    <div className="crm-title-row">
+                      <input className="crm-input" placeholder="e.g. Senior Product Designer"
+                        {...form.register("title", { required: "Required." })} />
+                      <button
+                        type="button"
+                        className={`crm-autofill-btn ${autoFilling ? "crm-autofill-btn--loading" : ""}`}
+                        disabled={autoFilling}
+                        onClick={handleAutoFill}
+                        title="AI fill — generates description, location, salary, and tags from your title"
+                      >
+                        <Sparkles size={13} className="mr-1 inline" />
+                        {autoFilling ? "Filling…" : "AI fill"}
+                      </button>
+                    </div>
                   </CrmField>
                   <CrmField label="Description" required error={form.formState.errors.description?.message}>
                     <textarea className="crm-input crm-textarea" rows={5}
@@ -850,4 +1026,50 @@ const css = `
     .crm-metrics{flex-wrap:wrap;}
     .crm-success{padding:40px 20px;}
   }
+  /* AI auto-fill */
+  .crm-title-row{display:flex;gap:8px;align-items:center;}
+  .crm-title-row .crm-input{flex:1;}
+  .crm-autofill-btn{height:42px;padding:0 14px;background:var(--o05);border:1px solid var(--o20);border-radius:2px;font-family:var(--fb);font-size:11px;font-weight:600;color:var(--o);cursor:pointer;white-space:nowrap;transition:all 0.12s;letter-spacing:0.04em;flex-shrink:0;}
+  .crm-autofill-btn:hover:not(:disabled){background:var(--o);color:var(--white);border-color:var(--o);}
+  .crm-autofill-btn:disabled{opacity:0.5;cursor:not-allowed;}
+  .crm-autofill-btn--loading{opacity:0.7;}
+  /* AI match button */
+  .crm-match-btn{height:36px;padding:0 14px;border:1px solid var(--o20);border-radius:2px;font-family:var(--fb);font-size:12px;font-weight:600;color:var(--o);background:var(--o05);cursor:pointer;white-space:nowrap;transition:all 0.12s;}
+  .crm-match-btn:hover:not(:disabled){background:var(--o);color:var(--white);border-color:var(--o);}
+  .crm-match-btn:disabled{opacity:0.5;cursor:not-allowed;}
+  /* AI match panel */
+  .crm-match-panel{border:1px solid var(--o20);border-radius:2px;margin-bottom:32px;overflow:hidden;}
+  .crm-match-panel-header{width:100%;display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--o05);border:none;cursor:pointer;font-family:var(--fb);}
+  .crm-match-panel-header:hover{background:var(--o08);}
+  .crm-match-panel-title{display:flex;align-items:center;font-size:12px;font-weight:600;color:var(--o);letter-spacing:0.04em;}
+  .crm-match-count{font-family:var(--fm);font-size:10px;color:var(--o40);margin-left:8px;font-weight:400;}
+  .crm-match-chevron{color:var(--o40);transition:transform 0.2s;flex-shrink:0;}
+  .crm-match-chevron--open{transform:rotate(180deg);}
+  .crm-match-body{padding:12px 0;}
+  .crm-match-loading{display:flex;align-items:center;gap:10px;padding:20px 16px;font-size:12px;color:var(--o40);}
+  .crm-match-spinner{width:16px;height:16px;border:2px solid var(--o12);border-top-color:var(--o);border-radius:50%;animation:crm-spin 0.7s linear infinite;flex-shrink:0;}
+  @keyframes crm-spin{to{transform:rotate(360deg)}}
+  .crm-match-empty{padding:20px 16px;font-size:12px;color:var(--o30);font-style:italic;}
+  .crm-match-list{display:flex;flex-direction:column;}
+  .crm-match-card{display:flex;align-items:flex-start;gap:12px;padding:12px 16px;border-bottom:1px solid var(--o08);transition:background 0.1s;}
+  .crm-match-card:last-child{border-bottom:none;}
+  .crm-match-card:hover{background:var(--o05);}
+  .crm-match-rank{font-family:var(--fm);font-size:10px;color:var(--o30);width:24px;flex-shrink:0;padding-top:3px;}
+  .crm-match-info{flex:1;min-width:0;}
+  .crm-match-top{display:flex;align-items:baseline;flex-wrap:wrap;gap:6px;margin-bottom:4px;}
+  .crm-match-name{font-size:13px;font-weight:600;color:var(--o);}
+  .crm-match-role{font-size:11px;color:var(--o40);}
+  .crm-match-rec{font-family:var(--fm);font-size:9px;letter-spacing:0.08em;padding:2px 6px;border-radius:2px;font-weight:600;}
+  .crm-match-rec--strong-hire,.crm-match-rec--hire{background:rgba(22,163,74,0.1);color:#15803d;border:1px solid rgba(22,163,74,0.2);}
+  .crm-match-rec--interview{background:var(--o08);color:var(--o);border:1px solid var(--o20);}
+  .crm-match-rec--maybe{background:rgba(234,179,8,0.1);color:#a16207;border:1px solid rgba(234,179,8,0.2);}
+  .crm-match-rec--pass{background:rgba(239,68,68,0.08);color:#dc2626;border:1px solid rgba(239,68,68,0.15);}
+  .crm-match-explanation{font-size:12px;color:rgba(10,31,51,0.65);line-height:1.55;margin:0 0 6px;}
+  .crm-match-tags-row{display:flex;flex-wrap:wrap;gap:4px;}
+  .crm-match-tag{font-family:var(--fm);font-size:10px;padding:2px 7px;border-radius:2px;letter-spacing:0.03em;}
+  .crm-match-tag--strength{background:rgba(22,163,74,0.08);color:#15803d;border:1px solid rgba(22,163,74,0.15);}
+  .crm-match-tag--gap{background:rgba(239,68,68,0.06);color:#dc2626;border:1px solid rgba(239,68,68,0.12);}
+  .crm-match-score-wrap{position:relative;width:44px;height:44px;flex-shrink:0;}
+  .crm-match-score-ring{width:44px;height:44px;}
+  .crm-match-score-num{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--fm);font-size:11px;font-weight:600;color:var(--o);}
 `;

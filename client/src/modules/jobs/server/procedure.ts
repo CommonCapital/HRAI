@@ -18,18 +18,18 @@ const employmentTypeSchema = z.enum([
 const workplaceTypeSchema = z.enum(["on_site", "remote", "hybrid"]);
 
 const jobFormSchema = z.object({
-  title: z.string().min(1, "Title is required").max(200),
-  description: z.string().min(1, "Description is required"),
-  location: z.string().min(1, "Location is required").max(200),
-  employmentType: employmentTypeSchema,
-  workplaceType: workplaceTypeSchema,
-  salaryMin: z.number().int().positive().nullable().optional(),
-  salaryMax: z.number().int().positive().nullable().optional(),
-  salaryCurrency: z.string().default("USD"),
-  tags: z.array(z.string()).optional(),
+  title:             z.string().min(1, "Title is required").max(200),
+  description:       z.string().min(1, "Description is required"),
+  location:          z.string().min(1, "Location is required").max(200),
+  employmentType:    employmentTypeSchema,
+  workplaceType:     workplaceTypeSchema,
+  salaryMin:         z.number().int().positive().nullable().optional(),
+  salaryMax:         z.number().int().positive().nullable().optional(),
+  salaryCurrency:    z.string().default("USD"),
+  tags:              z.array(z.string()).optional(),
   autoCloseOnAccept: z.boolean().optional().default(false),
-  agentId:         z.string().optional(),
-  autoOrchestrate: z.boolean().optional().default(false),
+  agentId:           z.string().optional(),
+  autoOrchestrate:   z.boolean().optional().default(false),
 });
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -88,9 +88,7 @@ export const jobsRouter = createTRPCRouter({
       }),
     )
     .query(async ({ ctx, input }) => {
-      const conditions = [
-        eq(jobListings.postedByUserId, ctx.auth.user.id),
-      ];
+      const conditions = [eq(jobListings.postedByUserId, ctx.auth.user.id)];
       if (!input.includeClosed) {
         conditions.push(eq(jobListings.isActive, true));
       }
@@ -155,7 +153,7 @@ export const jobsRouter = createTRPCRouter({
           autoCloseOnAccept: input.autoCloseOnAccept ?? false,
           applicationCount:  0,
           postedByUserId:    ctx.auth.user.id,
-          agentId:           input.agentId         ?? null,
+          agentId:           input.agentId        ?? null,
           autoOrchestrate:   input.autoOrchestrate ?? false,
         })
         .returning({ id: jobListings.id });
@@ -239,13 +237,11 @@ export const jobsRouter = createTRPCRouter({
       await requireOwner(input.jobId, ctx.auth.user.id);
       const now = new Date();
 
-      // Close the listing — simple update, no transaction dependency on notifications
       await db
         .update(jobListings)
         .set({ isActive: false, closedAt: now, updatedAt: now })
         .where(eq(jobListings.id, input.jobId));
 
-      // Best-effort: notify applicants if notifications table exists
       try {
         const pending = await db
           .select({ applicantUserId: applications.applicantUserId })
@@ -270,7 +266,7 @@ export const jobsRouter = createTRPCRouter({
               userId:   a.applicantUserId,
               type:     "job_closed" as const,
               title:    "Job listing closed",
-              message:  `This job listing is no longer accepting applications.`,
+              message:  "This job listing is no longer accepting applications.",
               linkUrl:  "/applications",
               metadata: { jobId: input.jobId },
               isRead:   false,
@@ -278,7 +274,6 @@ export const jobsRouter = createTRPCRouter({
           );
         }
       } catch (notifyErr) {
-        // Non-fatal — close succeeded even if notifications fail
         console.warn("[jobs.close] Notification insert failed (non-fatal):", notifyErr);
       }
 
@@ -344,5 +339,236 @@ export const jobsRouter = createTRPCRouter({
         .orderBy(desc(jobListings.createdAt))
         .limit(input.limit)
         .offset(input.offset);
+    }),
+
+  // ─── AI Auto-fill ─────────────────────────────────────────────────────────
+  // Takes a job title, returns a fully generated draft: description, location,
+  // employment type, workplace type, salary range, tags. One click to fill the form.
+
+  autoFill: protectedProcedure
+    .input(z.object({ title: z.string().min(1).max(200) }))
+    .mutation(async ({ input }) => {
+      if (!process.env.OPENAI_API_KEY) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "OPENAI_API_KEY not set." });
+      }
+
+      const OpenAI = (await import("openai")).default;
+      const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are an expert technical recruiter. Generate realistic, professional job listing content. Return only valid JSON with no markdown.",
+          },
+          {
+            role: "user",
+            content: `Generate a complete job listing for: "${input.title}"
+
+Return ONLY a valid JSON object with these exact fields:
+{
+  "description": "3-4 paragraph job description: what the company does, what the role involves, key responsibilities, what you're looking for. Plain text, no HTML.",
+  "location": "realistic city and country for this type of role",
+  "employmentType": "one of: full_time | part_time | contract | internship | temporary",
+  "workplaceType": "one of: on_site | remote | hybrid",
+  "salaryMin": integer annual USD or null,
+  "salaryMax": integer annual USD (20-40% above min) or null,
+  "salaryCurrency": "USD",
+  "tags": ["5-8 lowercase skill tags relevant to the role"]
+}`,
+          },
+        ],
+        response_format: { type: "json_object" },
+        temperature: 0.75,
+        max_tokens:  1500,
+      });
+
+      const raw = completion.choices[0].message.content ?? "{}";
+
+      try {
+        const data = JSON.parse(raw);
+        const validEmpTypes = ["full_time", "part_time", "contract", "internship", "temporary"];
+        const validWpTypes  = ["on_site", "remote", "hybrid"];
+
+        return {
+          description:    typeof data.description    === "string" ? data.description    : "",
+          location:       typeof data.location       === "string" ? data.location       : "",
+          employmentType: validEmpTypes.includes(data.employmentType) ? data.employmentType as any : "full_time",
+          workplaceType:  validWpTypes.includes(data.workplaceType)   ? data.workplaceType  as any : "hybrid",
+          salaryMin:      typeof data.salaryMin === "number" ? data.salaryMin : null,
+          salaryMax:      typeof data.salaryMax === "number" ? data.salaryMax : null,
+          salaryCurrency: typeof data.salaryCurrency === "string" ? data.salaryCurrency : "USD",
+          tags:           Array.isArray(data.tags)
+            ? (data.tags as any[]).filter((t) => typeof t === "string").slice(0, 10)
+            : [],
+        };
+      } catch {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "AI returned invalid response." });
+      }
+    }),
+
+  // ─── AI Candidate Matching ────────────────────────────────────────────────
+  // Fetches all applications for a job. Builds a rich candidate profile from
+  // the application row itself — fullName, currentRole, experienceYears,
+  // skills (free-text), education (jsonb), motivation, locationCity — then
+  // asks gpt-4o to rank and score every candidate against the job.
+  // Returns candidates ordered best → worst with score + explanation.
+
+  matchCandidates: protectedProcedure
+    .input(z.object({ jobId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      if (!process.env.OPENAI_API_KEY) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "OPENAI_API_KEY not set." });
+      }
+
+      const OpenAI = (await import("openai")).default;
+      const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+      // 1. Verify ownership + get job details
+      const job = await requireOwner(input.jobId, ctx.auth.user.id);
+
+      // 2. Get all applications
+      const apps = await db
+        .select()
+        .from(applications)
+        
+        .orderBy(desc(applications.createdAt));
+
+      if (apps.length === 0) {
+        return { matches: [], total: 0 };
+      }
+
+      // 3. Build compact candidate summaries from application fields only
+      const candidateList = apps.map((app) => {
+        const educationSummary =
+          Array.isArray(app.education) && app.education.length > 0
+            ? app.education
+                .map(
+                  (e) =>
+                    `${e.degree} in ${e.field} from ${e.institution} (${e.graduationYear})`,
+                )
+                .join("; ")
+            : null;
+
+        return {
+          id:              app.id,
+          name:            app.fullName,
+          currentRole:     app.currentRole,
+          experienceYears: app.experienceYears, // "0-1" | "1-3" | "3-5" | "5-10" | "10+"
+          location:        app.locationCity,
+          skills:          app.skills,           // free-text from the application form
+          education:       educationSummary,
+          motivation:      app.motivation?.substring(0, 300) ?? null,
+          status:          app.status,
+        };
+      });
+
+      // 4. Build prompt
+      const jobSummary = `
+Title: ${job.title}
+Location: ${job.location} | ${job.employmentType} | ${job.workplaceType}
+Salary: ${
+        job.salaryMin
+          ? `${job.salaryMin.toLocaleString()}–${job.salaryMax?.toLocaleString() ?? "?"} ${job.salaryCurrency}`
+          : "Undisclosed"
+      }
+Required skills / tags: ${job.tags.join(", ") || "None specified"}
+Description: ${stripHtml(job.description).substring(0, 600)}
+`.trim();
+
+      const prompt = `You are a senior recruiter AI. Score and rank every candidate below against this job.
+
+JOB:
+${jobSummary}
+
+CANDIDATES:
+${JSON.stringify(candidateList, null, 2)}
+
+Scoring weights: skill overlap 40%, experience level 30%, role/title relevance 20%, motivation quality 10%.
+
+Return ONLY valid JSON — no markdown, no backticks:
+{
+  "ranked": ["<app id best>", "<app id 2nd>", ...ALL ids best to worst],
+  "results": {
+    "<app id>": {
+      "score": <integer 0-100>,
+      "recommendation": "<Strong Hire|Hire|Interview|Maybe|Pass>",
+      "explanation": "<2 sentences explaining fit or lack thereof for THIS specific role>",
+      "strengths": ["<strength 1>", "<strength 2>"],
+      "gaps": ["<gap 1>", "<gap 2 if any>"]
+    }
+  }
+}
+
+Include EVERY candidate id in ranked.`;
+
+      const completion = await openai.chat.completions.create({
+        model:           "gpt-4o",
+        messages:        [{ role: "user", content: prompt }],
+        response_format: { type: "json_object" },
+        temperature:     0.1,
+        max_tokens:      4096,
+      });
+
+      const raw = (completion.choices[0].message.content ?? "{}").trim();
+
+      try {
+        const { ranked, results } = JSON.parse(raw) as {
+          ranked: string[];
+          results: Record<
+            string,
+            {
+              score:          number;
+              recommendation: string;
+              explanation:    string;
+              strengths:      string[];
+              gaps:           string[];
+            }
+          >;
+        };
+
+        const appMap    = new Map(apps.map((a) => [a.id, a]));
+        const candMap   = new Map(candidateList.map((c) => [c.id, c]));
+        const validRecs = ["Strong Hire", "Hire", "Interview", "Maybe", "Pass"];
+
+        const matches = ranked
+          .map((appId) => {
+            const cand   = candMap.get(appId);
+            const result = results[appId];
+            const app    = appMap.get(appId);
+            if (!cand || !result || !app) return null;
+
+            return {
+              applicationId:     appId,
+              candidateName:     cand.name,
+              currentRole:       cand.currentRole,
+              experienceYears:   cand.experienceYears,
+              location:          cand.location,
+              skills:            cand.skills,
+              score:             Math.min(100, Math.max(0, result.score ?? 0)),
+              recommendation:    validRecs.includes(result.recommendation)
+                ? result.recommendation
+                : "Maybe",
+              explanation:       result.explanation ?? "",
+              strengths:         Array.isArray(result.strengths)
+                ? result.strengths.slice(0, 3)
+                : [],
+              gaps:              Array.isArray(result.gaps)
+                ? result.gaps.slice(0, 2)
+                : [],
+              applicationStatus: app.status,
+            };
+          })
+          .filter(Boolean);
+
+        return { matches, total: matches.length };
+      } catch {
+        throw new TRPCError({
+          code:    "INTERNAL_SERVER_ERROR",
+          message: "AI returned invalid ranking. Try again.",
+        });
+      }
     }),
 });
