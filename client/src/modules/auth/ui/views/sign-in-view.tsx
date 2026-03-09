@@ -243,7 +243,7 @@ export const SignInView = () => {
           
           {/* Right Panel - Orange Background with Logo */}
           <div className="bg-primary relative hidden md:flex flex-col gap-y-6 items-center justify-center p-8 border-l-2 border-white/10">
-            <HRAILogo inverted={true} />
+            <HRAILogo inverted={false} />
             
             <div className="text-center space-y-4 mt-8">
               <h2 className="text-2xl font-semibold text-white tracking-tight">
