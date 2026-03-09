@@ -602,7 +602,8 @@ app.add_middleware(
         "http://localhost:3000",
         "http://localhost:3001",
         "https://hraiclient.vercel.app",
-        "https://hrai-dc6w6lyi7-nursans-projects.vercel.app"
+        "https://hrai-dc6w6lyi7-nursans-projects.vercel.app",
+        "https://hrai-psi.vercel.app"
     ],
     allow_credentials=True,
     allow_methods=["GET", "POST", "DELETE"],
