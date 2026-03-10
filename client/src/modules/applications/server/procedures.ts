@@ -1,6 +1,6 @@
 // src/modules/applications/server/procedures.ts
 // Wire into root router as:  applications: applicationsRouter
-
+import { waitUntil } from "@vercel/functions";
 import { baseProcedure, createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { db } from "@/db";
 import { applications, jobListings } from "@/db/schema";
@@ -125,27 +125,22 @@ export const applicationsRouter = createTRPCRouter({
       // ── Fire orchestration pipeline (non-blocking — never throws) ──────────
       // Run after response is sent so candidate doesn't wait for AI analysis.
       // Use setImmediate so the mutation returns first, pipeline runs after.
-      setImmediate(() => {
-        runOrchestrationPipeline({
-          applicationId:  inserted.id,
-          jobId:          input.jobId,
-          candidateName:  inserted.fullName,
-          candidateEmail: inserted.email,
-          cvUrl:          inserted.cvUrl,
-          recruiterId:    job.postedByUserId!,
-        }).then((result) => {
-          if (result.ranPipeline) {
-            console.log(
-              `[submit] Orchestration complete for ${inserted.id}:`,
-              `analysis=${result.cvAnalysisId}`,
-              `meeting=${result.meetingId}`,
-              `email=${result.emailSent}`,
-            );
-          } else {
-            console.log(`[submit] Orchestration skipped: ${result.skipReason}`);
-          }
-        });
-      });
+      waitUntil(
+  runOrchestrationPipeline({
+    applicationId:  inserted.id,
+    jobId:          input.jobId,
+    candidateName:  inserted.fullName,
+    candidateEmail: inserted.email,
+    cvUrl:          inserted.cvUrl,
+    recruiterId:    job.postedByUserId!,
+  }).then((result) => {
+    if (result.ranPipeline) {
+      console.log(`[submit] Orchestration complete for ${inserted.id}:`, result);
+    } else {
+      console.log(`[submit] Orchestration skipped: ${result.skipReason}`);
+    }
+  })
+);
 
       return {
         applicationId:   inserted.id,
