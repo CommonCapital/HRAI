@@ -224,7 +224,7 @@ Extract EVERY word, number, date, and detail. Don't summarize.`
     return text;
 
   } catch (error) {
-    console.log(error);
+    console.log("[extractTextFromPDF] REAL ERROR:", error);
     throw new Error("Failed to extract text from CV PDF");
   }
 };
