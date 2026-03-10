@@ -5,6 +5,7 @@ import { StreamTranscriptItem } from "@/modules/meetings/types";
 import { eq, inArray } from "drizzle-orm";
 import JSONL from "jsonl-parse-stringify";
 import {createAgent, openai, TextMessage} from "@inngest/agent-kit";
+import { runOrchestrationPipeline } from "@/modules/applications/server/orchestration.service";
 const dataReport = createAgent({
 name: "Data Report",
 system: `Generate a data report, according to the following prompt: ${agents.instructions2}`.trim(), 
@@ -72,4 +73,61 @@ status: "completed"
         }).where(eq(meetings.id, event.data.meetingId))
     })
     }
-)
+);
+
+
+export const orchestrateApplication = inngest.createFunction(
+  {
+    id:      "orchestrate-application",
+    name:    "Orchestrate Application Pipeline",
+    retries: 2,  // retry up to 2 times on failure
+  },
+  { event: "application/submitted" },
+
+  async ({ event, step }) => {
+    const {
+      applicationId,
+      jobId,
+      candidateName,
+      candidateEmail,
+      cvUrl,
+      recruiterId,
+    } = event.data;
+
+    // step.run gives you retries, logging, and a named step in the Inngest dashboard
+    const result = await step.run("run-orchestration-pipeline", async () => {
+      return runOrchestrationPipeline({
+        applicationId,
+        jobId,
+        candidateName,
+        candidateEmail,
+        cvUrl,
+        recruiterId,
+      });
+    });
+
+    // Log the outcome as a named step so it shows in the dashboard
+    await step.run("log-result", async () => {
+      if (!result.ranPipeline) {
+        console.log(`[inngest] Pipeline skipped: ${result.skipReason}`);
+        return { skipped: true, reason: result.skipReason };
+      }
+
+      console.log(
+        `[inngest] Pipeline complete for ${applicationId}:`,
+        `analysis=${result.cvAnalysisId}`,
+        `meeting=${result.meetingId}`,
+        `email=${result.emailSent}`,
+      );
+
+      return {
+        skipped:      false,
+        cvAnalysisId: result.cvAnalysisId,
+        meetingId:    result.meetingId,
+        emailSent:    result.emailSent,
+      };
+    });
+
+    return result;
+  },
+);

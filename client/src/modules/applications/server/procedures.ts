@@ -14,6 +14,7 @@ import {
   MIN_PAGE_SIZE,
 } from "@/constants";
 import { runOrchestrationPipeline } from "./orchestration.service";
+import { inngest } from "@/inngest/client";
 
 // ─── Shared schemas ───────────────────────────────────────────────────────────
 
@@ -125,22 +126,19 @@ export const applicationsRouter = createTRPCRouter({
       // ── Fire orchestration pipeline (non-blocking — never throws) ──────────
       // Run after response is sent so candidate doesn't wait for AI analysis.
       // Use setImmediate so the mutation returns first, pipeline runs after.
-      waitUntil(
-  runOrchestrationPipeline({
-    applicationId:  inserted.id,
-    jobId:          input.jobId,
-    candidateName:  inserted.fullName,
-    candidateEmail: inserted.email,
-    cvUrl:          inserted.cvUrl,
-    recruiterId:    job.postedByUserId!,
-  }).then((result) => {
-    if (result.ranPipeline) {
-      console.log(`[submit] Orchestration complete for ${inserted.id}:`, result);
-    } else {
-      console.log(`[submit] Orchestration skipped: ${result.skipReason}`);
-    }
-  })
-);
+      if (job.autoOrchestrate && job.agentId) {
+  await inngest.send({
+    name: "application/submitted",
+    data: {
+      applicationId:  inserted.id,
+      jobId:          input.jobId,
+      candidateName:  inserted.fullName,
+      candidateEmail: inserted.email,
+      cvUrl:          inserted.cvUrl,
+      recruiterId:    job.postedByUserId!,
+    },
+  });
+}
 
       return {
         applicationId:   inserted.id,
