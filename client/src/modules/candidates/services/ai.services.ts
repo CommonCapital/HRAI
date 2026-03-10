@@ -1,10 +1,9 @@
 import OpenAI from "openai";
 import { getFile } from "@/modules/candidates/services/file-storage";
 
-import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf";
-import { createCanvas } from "canvas";
-import * as pdfParseModule from "pdf-parse";
-const pdfParse = (pdfParseModule as any).default ?? pdfParseModule;
+import { extractText } from "unpdf";
+// then in extractTextFromPDF:
+
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 // HELPER: Retry logic for API calls
 async function callOpenAIWithRetry(requestFn: () => Promise<any>, maxRetries = 3): Promise<any> {
@@ -46,15 +45,18 @@ function calculateCompletenessScore(analysis: any): number {
 
 // ─── keep callOpenAIWithRetry, calculateCompletenessScore EXACTLY as-is ───────
 
+
 export const extractTextFromPDF = async (fileKey: string) => {
   let totalCost = 0;
 
   try {
-    // ── Fetch file buffer ────────────────────────────────────────────────────
-    // fileKey is now a Vercel Blob URL — fetch it directly
+    console.log("[extractTextFromPDF] fileKey received:", fileKey);
+
+    // ── Fetch buffer ─────────────────────────────────────────────────────────
     let buffer: Buffer;
     if (fileKey.startsWith("http://") || fileKey.startsWith("https://")) {
       const res = await fetch(fileKey);
+      if (!res.ok) throw new Error(`Fetch failed: ${res.status} ${res.statusText}`);
       buffer = Buffer.from(await res.arrayBuffer());
     } else {
       const fileData = getFile(fileKey);
@@ -64,27 +66,22 @@ export const extractTextFromPDF = async (fileKey: string) => {
 
     console.log("📄 Extracting text from CV/Resume PDF...");
 
-    // ── Text extraction via pdf-parse (replaces pdftotext) ───────────────────
-    const parsed    = await pdfParse(buffer);
-    const textOutput = parsed.text ?? "";
-    const numPages   = parsed.numpages ?? 1;
-    const totalChars = textOutput.length;
+    // ── Text extraction via unpdf ─────────────────────────────────────────────
+    const { text: textOutput, totalPages: numPages } = await extractText(
+      new Uint8Array(buffer),
+      { mergePages: true }
+    );
+    const totalChars = (textOutput ?? "").length;
 
     console.log("   Total pages:", numPages);
     console.log("   Text extracted:", totalChars, "characters");
 
-    // Format with page markers (same structure as before)
-    let text = "";
-    const pages = textOutput.split("\f");
-    for (let i = 0; i < pages.length; i++) {
-      text += `\n━━━ PAGE ${i + 1} START ━━━\n`;
-      text += pages[i].trim() + "\n";
-      text += `━━━ PAGE ${i + 1} END ━━━\n`;
-    }
+    // Format with page markers
+    let text = `\n━━━ PAGE 1 START ━━━\n${(textOutput ?? "").trim()}\n━━━ PAGE 1 END ━━━\n`;
 
-    const avgCharsPerPage = totalChars / numPages;
+    const avgCharsPerPage = totalChars / (numPages || 1);
 
-    // ── Vision fallback (replaces pdftoppm) ──────────────────────────────────
+    // ── Vision fallback via OpenAI Files API (handles scanned/image PDFs) ────
     if (avgCharsPerPage < 100 || totalChars < 200) {
       console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
       console.log("⚠️  LOW TEXT EXTRACTION DETECTED!");
@@ -92,76 +89,63 @@ export const extractTextFromPDF = async (fileKey: string) => {
       console.log("   Average chars/page:", Math.round(avgCharsPerPage));
       console.log("   Pages:", numPages);
       console.log("   This CV is likely image-based or scanned");
-      console.log("🔍 ACTIVATING VISION MODE WITH pdfjs-dist...");
+      console.log("🔍 ACTIVATING VISION MODE via OpenAI Files API...");
       console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
+      let uploadedFileId: string | null = null;
+
       try {
-        const pagesToProcess = Math.min(numPages, 10);
-        console.log(`📸 Converting ${pagesToProcess} pages to images using pdfjs-dist...`);
-        console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        // Upload PDF to OpenAI Files API
+        const blob = new Blob([new Uint8Array(buffer)], { type: "application/pdf" });
+        const file = new File([blob], "cv.pdf", { type: "application/pdf" });
 
-        const pdfDoc = await pdfjsLib.getDocument({ data: new Uint8Array(buffer) }).promise;
-        const images: string[] = [];
+        console.log("📤 Uploading PDF to OpenAI Files API...");
+        const uploadedFile = await openai.files.create({
+          file,
+          purpose: "assistants",
+        });
+        uploadedFileId = uploadedFile.id;
+        console.log("   ✓ Uploaded, file_id:", uploadedFileId);
 
-        console.log("📊 PROGRESS TRACKING:");
-
-        for (let i = 1; i <= pagesToProcess; i++) {
-          const page     = await pdfDoc.getPage(i);
-          const viewport = page.getViewport({ scale: 2.0 }); // ~200 DPI equivalent
-          const canvas   = createCanvas(viewport.width, viewport.height);
-          const context  = canvas.getContext("2d") as any;
-
-          await page.render({ canvasContext: context, viewport }).promise;
-
-          const base64 = canvas.toBuffer("image/png").toString("base64");
-          images.push(base64);
-
-          const progress = Math.round((i / pagesToProcess) * 100);
-          console.log(`   [${progress}%] Page ${i}/${pagesToProcess} encoded`);
-        }
-
-        console.log(`   ✓ Converted ${images.length} pages to images`);
-
-        const visionCost = images.length * 0.00255;
+        const visionCost = 0.00255;
         totalCost += visionCost;
 
-        console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
         console.log("📤 Sending to GPT-4o Vision API...");
-        console.log(`   Images: ${images.length}`);
         console.log(`   Vision cost: $${visionCost.toFixed(4)}`);
         console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-
-        // ── Vision API call — identical to original ──────────────────────────
-        const visionContent: any[] = [
-          {
-            type: "text",
-            text: `Extract ALL text from this ${images.length}-page CV/resume.
-
-Format your response EXACTLY like this:
-
-━━━ PAGE 1 START ━━━
-[All text from page 1]
-━━━ PAGE 1 END ━━━
-
-━━━ PAGE 2 START ━━━
-[All text from page 2]
-━━━ PAGE 2 END ━━━
-
-Extract EVERY word, number, date, and detail. Don't summarize.`
-          }
-        ];
-
-        images.forEach((base64) => {
-          visionContent.push({
-            type: "image_url",
-            image_url: { url: `data:image/png;base64,${base64}`, detail: "high" }
-          });
-        });
 
         const visionResponse = await callOpenAIWithRetry(() =>
           openai.chat.completions.create({
             model: "gpt-4o",
-            messages: [{ role: "user", content: visionContent }],
+            messages: [
+              {
+                role: "user",
+                content: [
+                  {
+                    type: "text",
+                    text: `Extract ALL text and describe ALL images/charts/tables from this CV/resume PDF.
+
+Format page by page:
+
+━━━ PAGE 1 START ━━━
+[All text and image descriptions from page 1]
+━━━ PAGE 1 END ━━━
+
+━━━ PAGE 2 START ━━━
+[All text and image descriptions from page 2]
+━━━ PAGE 2 END ━━━
+
+For images: describe them in detail — charts, photos, logos, diagrams.
+Extract EVERY word, number, date, and detail. Don't summarize.`,
+                  },
+                  {
+                    // @ts-expect-error file type supported in gpt-4o
+                    type: "file",
+                    file: { file_id: uploadedFileId },
+                  },
+                ],
+              },
+            ],
             max_tokens: 16000,
             temperature: 0.1,
           })
@@ -187,21 +171,24 @@ Extract EVERY word, number, date, and detail. Don't summarize.`
         console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
         console.log("❌ VISION EXTRACTION FAILED");
         console.log("   Error:", visionError.message || visionError);
-
-        if (visionError.status === 429) {
-          console.log("   Rate limit hit. Try again in a few minutes.");
-        } else if (visionError.status === 400) {
-          console.log("   Image format issue. PDF may be corrupted.");
-        }
-
+        if (visionError.status === 429) console.log("   Rate limit hit. Try again in a few minutes.");
+        if (visionError.status === 400) console.log("   Image format issue. PDF may be corrupted.");
         console.log("⚠️  Falling back to text extraction");
-
         if (totalChars < 500) {
           console.log("⚠️⚠️⚠️ WARNING: Analysis quality will be significantly reduced!");
           console.log("   Only", totalChars, "chars extracted from", numPages, "pages");
         }
-
         console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+      } finally {
+        // Always clean up the uploaded file
+        if (uploadedFileId) {
+          try {
+            await openai.files.delete(uploadedFileId);
+            console.log("🗑️  Cleaned up OpenAI file:", uploadedFileId);
+          } catch {
+            console.log("⚠️  Could not delete OpenAI file:", uploadedFileId);
+          }
+        }
       }
     }
 
