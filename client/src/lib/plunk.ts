@@ -16,12 +16,12 @@ export interface PlunkResult {
 }
 
 export async function sendEmail(payload: PlunkEmailPayload): Promise<PlunkResult> {
-  const key = process.env.PLUNK_PUBLIC_KEY;
+  const key = process.env.PLUNK_SECRET_KEY; // ✅ Secret key for server-side sending
 
-  if (!key) {
-    console.warn("[plunk] PLUNK_PUBLIC_KEY is not set — email skipped.");
-    return { success: false, error: "PLUNK_PUBLIC_KEY not configured" };
-  }
+if (!key) {
+  console.warn("[plunk] PLUNK_SECRET_KEY is not set — email skipped.");
+  return { success: false, error: "PLUNK_SECRET_KEY not configured" };
+}
 
   try {
     const res = await fetch(PLUNK_API, {
