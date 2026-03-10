@@ -156,7 +156,7 @@ export function EditJobView({ jobId }: { jobId: string }) {
 
         {/* Header */}
         <div className="ej-header">
-          <button className="ej-back-btn" onClick={() => router.push("/company/jobs")}>
+          <button className="ej-back-btn" onClick={() => router.push("/jobs")}>
             <ArrowLeft size={15} strokeWidth={1.5} className="mr-1.5 inline" />
             Back to listings
           </button>
@@ -362,7 +362,7 @@ export function EditJobView({ jobId }: { jobId: string }) {
           {/* Submit */}
           <div className="ej-submit-row">
             <button type="button" className="ej-cancel-btn"
-              onClick={() => router.push("/company/jobs")}>
+              onClick={() => router.push("/jobs")}>
               Cancel
             </button>
             <button type="submit" className="ej-submit-btn" disabled={updateJob.isPending}>

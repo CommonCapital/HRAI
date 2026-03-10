@@ -412,7 +412,7 @@ const EXP_LABELS: Record<string, string> = {
                 </div>
                 <div className="crm-detail-header-actions">
                   <button className="crm-edit-btn"
-                    onClick={() => router.push(`/company/jobs/${selectedJob.id}/edit`)}>
+                    onClick={() => router.push(`/jobs/${selectedJob.id}/edit`)}>
                     Edit listing →
                   </button>
                   <button className="crm-applicants-btn"
