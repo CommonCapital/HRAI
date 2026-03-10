@@ -1,59 +1,35 @@
 // src/lib/plunk.ts
+import { Resend } from "resend";
 
-const PLUNK_API = "https://api.useplunk.com/v1/send"; // hardcoded — NOT from env
-
-export interface PlunkEmailPayload {
-  to:     string;
-  subject: string;
-  body:    string;
-  name?:   string;
-}
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 export interface PlunkResult {
-  success:    boolean;
+  success: boolean;
   messageId?: string;
-  error?:     string;
+  error?: string;
 }
 
-export async function sendEmail(payload: PlunkEmailPayload): Promise<PlunkResult> {
-  const key = process.env.PLUNK_SECRET_KEY; // ✅ Secret key for server-side sending
-
-if (!key) {
-  console.warn("[plunk] PLUNK_SECRET_KEY is not set — email skipped.");
-  return { success: false, error: "PLUNK_SECRET_KEY not configured" };
-}
-
+export async function sendEmail(payload: {
+  to: string;
+  subject: string;
+  body: string;
+}): Promise<PlunkResult> {
   try {
-    const res = await fetch(PLUNK_API, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization:  `Bearer ${key}`,
-      },
-      body: JSON.stringify({
-        to:         payload.to,
-        subject:    payload.subject,
-        body:       payload.body,
-        subscribed: true, // required by Plunk — omitting causes 400
-        ...(payload.name ? { name: payload.name } : {}),
-      }),
+    const { data, error } = await resend.emails.send({
+      from: "HRAi <onboarding@resend.dev>", // ← your verified domain
+      to: payload.to,
+      subject: payload.subject,
+      html: payload.body,
     });
 
-    const json = await res.json().catch(() => ({}));
-
-    if (!res.ok) {
-      console.error("[plunk] send failed:", res.status, json);
-      return { success: false, error: json?.message ?? `HTTP ${res.status}` };
-    }
-
-    return { success: true, messageId: json?.id };
+    if (error) return { success: false, error: error.message };
+    return { success: true, messageId: data?.id };
   } catch (err: any) {
-    console.error("[plunk] network error:", err);
     return { success: false, error: err.message };
   }
 }
 
-// ── Email templates ───────────────────────────────────────────────────────────
+ // keep your template as-is// ── Email templates ───────────────────────────────────────────────────────────
 
 export function buildInterviewInviteEmail(params: {
   candidateName: string;
