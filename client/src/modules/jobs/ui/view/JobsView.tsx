@@ -6,7 +6,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { useTRPC } from "@/trpc/client";
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
-import { Brain, Check, ChevronDown, Copy, ExternalLink, PlusCircle, Sparkles, Users, Zap, ZapOff } from "lucide-react";
+import { Brain, Check, ChevronDown, Copy, ExternalLink, Mail, PlusCircle, Sparkles, Users, Zap, ZapOff } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { CommandSelect } from "@/components/command-select";
@@ -19,10 +19,11 @@ type RightPanel = "create" | "detail" | "created";
 type MatchResult = {
   applicationId:     string;
   candidateName:     string;
+  candidateEmail:    string | null;
   currentRole:       string | null;
-  experienceYears:   string | null;   // "0-1" | "1-3" | "3-5" | "5-10" | "10+"
+  experienceYears:   string | null;
   location:          string | null;
-  skills:            string;          // free-text string from the application form
+  skills:            string;
   score:             number;
   recommendation:    string;
   explanation:       string;
@@ -30,7 +31,6 @@ type MatchResult = {
   gaps:              string[];
   applicationStatus: string;
 };
-
 
 type JobFormValues = {
   title:             string;
@@ -43,7 +43,6 @@ type JobFormValues = {
   salaryCurrency:    string;
   tags:              string;
   autoCloseOnAccept: boolean;
-  // ── NEW ──
   agentId:           string;
   autoOrchestrate:   boolean;
 };
@@ -70,28 +69,33 @@ export function JobsView() {
   const router      = useRouter();
   const trpc        = useTRPC();
   const queryClient = useQueryClient();
-const EXP_LABELS: Record<string, string> = {
-  "0-1":  "0–1 yrs",
-  "1-3":  "1–3 yrs",
-  "3-5":  "3–5 yrs",
-  "5-10": "5–10 yrs",
-  "10+":  "10+ yrs",
-};
+
+  const EXP_LABELS: Record<string, string> = {
+    "0-1":  "0–1 yrs",
+    "1-3":  "1–3 yrs",
+    "3-5":  "3–5 yrs",
+    "5-10": "5–10 yrs",
+    "10+":  "10+ yrs",
+  };
+
   const [showClosed,    setShowClosed]    = useState(false);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [rightPanel,    setRightPanel]    = useState<RightPanel>("create");
   const [feedback,      setFeedback]      = useState<string | null>(null);
   const [pendingId,     setPendingId]     = useState<string | null>(null);
   const [agentSearch,   setAgentSearch]   = useState("");
-
-  // AI auto-fill state
-  const [autoFilling, setAutoFilling] = useState(false);
+  const [autoFilling,   setAutoFilling]   = useState(false);
 
   // AI match state
   const [matchLoading,  setMatchLoading]  = useState(false);
   const [matchData,     setMatchData]     = useState<MatchResult[] | null>(null);
   const [matchJobId,    setMatchJobId]    = useState<string | null>(null);
   const [matchExpanded, setMatchExpanded] = useState(true);
+
+  // ── Invite-from-match state ───────────────────────────────────────────────
+  const [matchSelected,     setMatchSelected]     = useState<Set<string>>(new Set());
+  const [matchInviteSending, setMatchInviteSending] = useState(false);
+  const [matchInviteDone,   setMatchInviteDone]   = useState<string | null>(null);
 
   // After-creation state
   const [createdJobId,       setCreatedJobId]       = useState<string | null>(null);
@@ -105,7 +109,7 @@ const EXP_LABELS: Record<string, string> = {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // ── Queries ──────────────────────────────────────────────────────────────
+  // ── Queries ───────────────────────────────────────────────────────────────
   const { data: jobs } = useSuspenseQuery(
     trpc.jobs.myJobs.queryOptions({ includeClosed: showClosed }),
   );
@@ -139,7 +143,7 @@ const EXP_LABELS: Record<string, string> = {
   const closeJob = useMutation(
     trpc.jobs.close.mutationOptions({
       onSuccess: () => { invalidateJobs(); setFeedback("Listing closed."); setPendingId(null); },
-      onError:   (e) => { setFeedback(`Error: ${e.message}`); setPendingId(null); console.error("[closeJob]", e); },
+      onError:   (e) => { setFeedback(`Error: ${e.message}`); setPendingId(null); },
     }),
   );
 
@@ -194,6 +198,8 @@ const EXP_LABELS: Record<string, string> = {
     setMatchData(null);
     setMatchJobId(jobId);
     setMatchExpanded(true);
+    setMatchSelected(new Set());
+    setMatchInviteDone(null);
     try {
       const result = await matchMutation.mutateAsync({ jobId });
       setMatchData(result.matches as MatchResult[]);
@@ -201,6 +207,32 @@ const EXP_LABELS: Record<string, string> = {
       setFeedback(`Match failed: ${e.message}`);
     } finally {
       setMatchLoading(false);
+    }
+  }
+
+  // ── Send invites from match panel ─────────────────────────────────────────
+  async function handleMatchInvite(jobId: string) {
+    setMatchInviteSending(true);
+    try {
+      const res = await fetch(`/api/jobs/${jobId}/invite-apply`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ candidateIds: Array.from(matchSelected) }),
+      });
+      const data = await res.json();
+      const sent = data.summary?.sent ?? 0;
+      const failed = data.summary?.failed ?? 0;
+      setMatchInviteDone(
+        failed > 0
+          ? `${sent} invite${sent !== 1 ? "s" : ""} sent · ${failed} failed (no email on file)`
+          : `${sent} invite${sent !== 1 ? "s" : ""} sent successfully!`
+      );
+      setMatchSelected(new Set());
+      setTimeout(() => setMatchInviteDone(null), 5000);
+    } catch (e: any) {
+      setMatchInviteDone(`Error: ${e.message}`);
+    } finally {
+      setMatchInviteSending(false);
     }
   }
 
@@ -213,7 +245,6 @@ const EXP_LABELS: Record<string, string> = {
   const selWp           = form.watch("workplaceType");
   const currency        = form.watch("salaryCurrency") || "USD";
 
-  // If agent is cleared, force autoOrchestrate off
   const handleAgentSelect = (val: string) => {
     form.setValue("agentId", val);
     if (!val) form.setValue("autoOrchestrate", false);
@@ -232,7 +263,6 @@ const EXP_LABELS: Record<string, string> = {
       salaryCurrency:    values.salaryCurrency || "USD",
       tags:              values.tags.split(",").map((t) => t.trim()).filter(Boolean),
       autoCloseOnAccept: values.autoCloseOnAccept,
-      // ── NEW ──
       agentId:           values.agentId || undefined,
       autoOrchestrate:   values.agentId ? values.autoOrchestrate : false,
     });
@@ -268,13 +298,11 @@ const EXP_LABELS: Record<string, string> = {
                 form.reset(DEFAULT_FORM);
               }}>+ New</button>
             </div>
-
             <div className="crm-left-stats">
               <span className="crm-stat">{activeCount}<em>active</em></span>
               <span className="crm-stat-sep" />
               <span className="crm-stat crm-stat--dim">{closedCount}<em>closed</em></span>
             </div>
-
             <button
               className={`crm-toggle-closed ${showClosed ? "crm-toggle-closed--on" : ""}`}
               onClick={() => setShowClosed((v) => !v)}
@@ -297,7 +325,12 @@ const EXP_LABELS: Record<string, string> = {
                   <button
                     key={job.id}
                     className={`crm-list-item ${isSelected ? "crm-list-item--selected" : ""} ${!job.isActive ? "crm-list-item--closed" : ""}`}
-                    onClick={() => { setSelectedJobId(job.id); setRightPanel("detail"); setFeedback(null); if (matchJobId !== job.id) { setMatchData(null); setMatchJobId(null); } }}
+                    onClick={() => {
+                      setSelectedJobId(job.id);
+                      setRightPanel("detail");
+                      setFeedback(null);
+                      if (matchJobId !== job.id) { setMatchData(null); setMatchJobId(null); }
+                    }}
                   >
                     <div className="crm-item-top">
                       <span className="crm-item-title">{job.title}</span>
@@ -339,7 +372,6 @@ const EXP_LABELS: Record<string, string> = {
               <div className="crm-success-check">
                 <Check strokeWidth={1.5} className="crm-success-check-icon" />
               </div>
-
               <div className="crm-success-copy">
                 <h2 className="crm-success-title">Job Listed</h2>
                 {createdAutoEnabled ? (
@@ -354,7 +386,6 @@ const EXP_LABELS: Record<string, string> = {
                   </p>
                 )}
               </div>
-
               <div className="crm-success-url-row">
                 <Input value={applyLink} readOnly className="crm-success-input" />
                 <Button variant="outline" className="crm-success-copy-btn" onClick={handleCopyLink}>
@@ -364,7 +395,6 @@ const EXP_LABELS: Record<string, string> = {
                   }
                 </Button>
               </div>
-
               <div className="crm-success-actions">
                 <Button className="crm-success-btn-primary" onClick={() => window.open(applyLink, "_blank")}>
                   <ExternalLink size={17} strokeWidth={1.5} className="mr-2" />
@@ -480,52 +510,134 @@ const EXP_LABELS: Record<string, string> = {
                       ) : matchData && matchData.length === 0 ? (
                         <p className="crm-match-empty">No applications yet to rank.</p>
                       ) : (
-                        <div className="crm-match-list">
-                          {matchData?.map((m, idx) => (
-                            <div key={m.applicationId} className="crm-match-card">
-  <div className="crm-match-rank">#{idx + 1}</div>
-  <div className="crm-match-info">
-    <div className="crm-match-top">
-      <span className="crm-match-name">{m.candidateName}</span>
-      {m.currentRole && (
-        <span className="crm-match-role">{m.currentRole}</span>
-      )}
-      {m.experienceYears && (
-        <span className="crm-match-exp">{EXP_LABELS[m.experienceYears] ?? m.experienceYears}</span>
-      )}
-      <span className={`crm-match-rec crm-match-rec--${m.recommendation.toLowerCase().replace(" ", "-")}`}>
-        {m.recommendation}
-      </span>
-    </div>
-    <p className="crm-match-explanation">{m.explanation}</p>
-    {(m.strengths.length > 0 || m.gaps.length > 0) && (
-      <div className="crm-match-tags-row">
-        {m.strengths.map((s) => (
-          <span key={s} className="crm-match-tag crm-match-tag--strength">✓ {s}</span>
-        ))}
-        {m.gaps.map((g) => (
-          <span key={g} className="crm-match-tag crm-match-tag--gap">✗ {g}</span>
-        ))}
-      </div>
-    )}
-  </div>
-  <div className="crm-match-score-wrap">
-    <svg viewBox="0 0 36 36" className="crm-match-score-ring">
-      <circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(255,106,0,0.1)" strokeWidth="3" />
-      <circle
-        cx="18" cy="18" r="15.9" fill="none"
-        stroke={m.score >= 70 ? "#FF6A00" : m.score >= 50 ? "#f97316" : "rgba(255,106,0,0.3)"}
-        strokeWidth="3"
-        strokeDasharray={`${m.score} 100`}
-        strokeLinecap="round"
-        transform="rotate(-90 18 18)"
-      />
-    </svg>
-    <span className="crm-match-score-num">{m.score}</span>
-  </div>
-</div>
-                          ))}
-                        </div>
+                        <>
+                          {/* Select-all bar */}
+                          <div className="crm-match-select-bar">
+                            <button
+                              className="crm-match-select-all"
+                              onClick={() => {
+                                const allIds = (matchData ?? []).map(m => m.applicationId);
+                                if (matchSelected.size === allIds.length) {
+                                  setMatchSelected(new Set());
+                                } else {
+                                  setMatchSelected(new Set(allIds));
+                                }
+                              }}
+                            >
+                              {matchSelected.size === (matchData ?? []).length && (matchData ?? []).length > 0
+                                ? "Deselect all"
+                                : `Select all ${(matchData ?? []).length}`}
+                            </button>
+                            {matchSelected.size > 0 && (
+                              <span className="crm-match-selected-count">
+                                {matchSelected.size} selected
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="crm-match-list">
+                            {matchData?.map((m, idx) => {
+                              const isSel = matchSelected.has(m.applicationId);
+                              return (
+                                <div
+                                  key={m.applicationId}
+                                  className="crm-match-card"
+                                  style={{ cursor: "pointer", background: isSel ? "rgba(255,106,0,0.04)" : undefined }}
+                                  onClick={() => setMatchSelected(prev => {
+                                    const n = new Set(prev);
+                                    isSel ? n.delete(m.applicationId) : n.add(m.applicationId);
+                                    return n;
+                                  })}
+                                >
+                                  {/* Checkbox */}
+                                  <div style={{
+                                    width: 16, height: 16, borderRadius: 3,
+                                    border: `2px solid ${isSel ? "var(--o)" : "var(--o20)"}`,
+                                    background: isSel ? "var(--o)" : "#fff",
+                                    display: "flex", alignItems: "center", justifyContent: "center",
+                                    flexShrink: 0, marginTop: 2, transition: "all 0.12s",
+                                  }}>
+                                    {isSel && <span style={{ color: "#fff", fontSize: 10, fontWeight: 900, lineHeight: 1 }}>✓</span>}
+                                  </div>
+
+                                  <div className="crm-match-rank">#{idx + 1}</div>
+                                  <div className="crm-match-info">
+                                    <div className="crm-match-top">
+                                      <span className="crm-match-name">{m.candidateName}</span>
+                                      {m.currentRole && (
+                                        <span className="crm-match-role">{m.currentRole}</span>
+                                      )}
+                                      {m.experienceYears && (
+                                        <span className="crm-match-exp">{EXP_LABELS[m.experienceYears] ?? m.experienceYears}</span>
+                                      )}
+                                      <span className={`crm-match-rec crm-match-rec--${m.recommendation.toLowerCase().replace(" ", "-")}`}>
+                                        {m.recommendation}
+                                      </span>
+                                      {/* Email indicator */}
+                                      {m.candidateEmail ? (
+                                        <span className="crm-match-has-email">
+                                          <Mail size={9} className="inline mr-0.5" />{m.candidateEmail}
+                                        </span>
+                                      ) : (
+                                        <span className="crm-match-no-email">no email</span>
+                                      )}
+                                    </div>
+                                    <p className="crm-match-explanation">{m.explanation}</p>
+                                    {(m.strengths.length > 0 || m.gaps.length > 0) && (
+                                      <div className="crm-match-tags-row">
+                                        {m.strengths.map((s) => (
+                                          <span key={s} className="crm-match-tag crm-match-tag--strength">✓ {s}</span>
+                                        ))}
+                                        {m.gaps.map((g) => (
+                                          <span key={g} className="crm-match-tag crm-match-tag--gap">✗ {g}</span>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="crm-match-score-wrap">
+                                    <svg viewBox="0 0 36 36" className="crm-match-score-ring">
+                                      <circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(255,106,0,0.1)" strokeWidth="3" />
+                                      <circle
+                                        cx="18" cy="18" r="15.9" fill="none"
+                                        stroke={m.score >= 70 ? "#FF6A00" : m.score >= 50 ? "#f97316" : "rgba(255,106,0,0.3)"}
+                                        strokeWidth="3"
+                                        strokeDasharray={`${m.score} 100`}
+                                        strokeLinecap="round"
+                                        transform="rotate(-90 18 18)"
+                                      />
+                                    </svg>
+                                    <span className="crm-match-score-num">{m.score}</span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+
+                          {/* ── Send Invite Bar ── */}
+                          <div className="crm-match-invite-bar">
+                            {matchInviteDone ? (
+                              <p className="crm-match-invite-done">{matchInviteDone}</p>
+                            ) : (
+                              <>
+                                <p className="crm-match-invite-hint">
+                                  {matchSelected.size === 0
+                                    ? "Check candidates above to invite them to apply"
+                                    : `${matchSelected.size} candidate${matchSelected.size !== 1 ? "s" : ""} selected`}
+                                </p>
+                                <button
+                                  className="crm-match-invite-btn"
+                                  disabled={matchSelected.size === 0 || matchInviteSending}
+                                  onClick={() => handleMatchInvite(selectedJob.id)}
+                                >
+                                  <Mail size={13} className="inline mr-1" />
+                                  {matchInviteSending
+                                    ? "Sending…"
+                                    : `Send Invite${matchSelected.size !== 1 ? "s" : ""}${matchSelected.size > 0 ? ` (${matchSelected.size})` : ""}`}
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </>
                       )}
                     </div>
                   )}
@@ -572,8 +684,6 @@ const EXP_LABELS: Record<string, string> = {
                       onClick={() => { setPendingId(selectedJob.id); toggleAutoClose.mutate({ jobId: selectedJob.id }); }}
                     ><span className="crm-switch-thumb" /></button>
                   </div>
-
-                  {/* Auto-orchestrate indicator (read-only in detail — change via Edit) */}
                   <div className="crm-setting-row">
                     <div>
                       <p className="crm-setting-name">
@@ -637,7 +747,6 @@ const EXP_LABELS: Record<string, string> = {
               </div>
 
               <form onSubmit={form.handleSubmit(onSubmit)} noValidate className="crm-form">
-
                 <CrmSection num="01" title="The Role">
                   <CrmField label="Job title" required error={form.formState.errors.title?.message}>
                     <div className="crm-title-row">
@@ -648,7 +757,6 @@ const EXP_LABELS: Record<string, string> = {
                         className={`crm-autofill-btn ${autoFilling ? "crm-autofill-btn--loading" : ""}`}
                         disabled={autoFilling}
                         onClick={handleAutoFill}
-                        title="AI fill — generates description, location, salary, and tags from your title"
                       >
                         <Sparkles size={13} className="mr-1 inline" />
                         {autoFilling ? "Filling…" : "AI fill"}
@@ -724,7 +832,6 @@ const EXP_LABELS: Record<string, string> = {
                   </button>
                 </CrmSection>
 
-                {/* ── Section 06 — Automation (NEW) ────────────────────── */}
                 <CrmSection num="06" title="Automation">
                   <div className="crm-auto-section">
                     <div className="crm-auto-intro">
@@ -734,8 +841,6 @@ const EXP_LABELS: Record<string, string> = {
                         invitations to qualified candidates — no manual review needed.
                       </p>
                     </div>
-
-                    {/* Agent picker */}
                     <CrmField label="AI interview agent">
                       <CommandSelect
                         options={[
@@ -754,8 +859,6 @@ const EXP_LABELS: Record<string, string> = {
                         placeholder="Select AI agent…"
                       />
                     </CrmField>
-
-                    {/* Auto-orchestrate toggle — disabled when no agent */}
                     <button
                       type="button"
                       disabled={!selectedAgentId}
@@ -837,8 +940,6 @@ function formatSalary(min?: number | null, max?: number | null, currency?: strin
 }
 
 // ─── CSS ──────────────────────────────────────────────────────────────────────
-// (Same base tokens as before — only new automation rules added at the bottom)
-
 const css = `
   .crm-root {
     --o:    #FF6A00;
@@ -855,7 +956,6 @@ const css = `
     display:flex;height:100vh;overflow:hidden;
     background:var(--white);font-family:var(--fb);color:var(--o);
   }
-  /* LEFT */
   .crm-left{width:300px;min-width:300px;border-right:1px solid var(--o12);display:flex;flex-direction:column;overflow:hidden;}
   .crm-left-header{padding:28px 20px 16px;border-bottom:1px solid var(--o08);flex-shrink:0;}
   .crm-left-title-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
@@ -894,11 +994,9 @@ const css = `
   .crm-item-badges{display:flex;gap:4px;}
   .crm-item-badge{font-family:var(--fm);font-size:9px;letter-spacing:0.06em;color:var(--o40);border:1px solid var(--o20);border-radius:2px;padding:1px 5px;}
   .crm-item-badge--auto{background:var(--o08);color:var(--o);border-color:var(--o20);}
-  /* RIGHT */
   .crm-right{flex:1;overflow-y:auto;min-width:0;}
   .crm-right::-webkit-scrollbar{width:4px;}
   .crm-right::-webkit-scrollbar-thumb{background:var(--o12);border-radius:2px;}
-  /* SUCCESS */
   .crm-success{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;min-height:100%;padding:80px 40px;animation:crm-fade 0.25s ease;}
   .crm-success-check{width:80px;height:80px;border:2px solid var(--o20);background:var(--o05);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
   .crm-success-check-icon{width:40px;height:40px;color:var(--o);}
@@ -916,7 +1014,6 @@ const css = `
   .crm-success-btn-secondary{border:1px solid var(--o20);border-radius:2px;height:44px;padding:0 20px;font-size:12px;color:var(--o);}
   .crm-success-btn-secondary:hover{border-color:var(--o);background:var(--o05);}
   @keyframes crm-fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
-  /* DETAIL */
   .crm-detail{padding:40px 48px 80px;max-width:680px;animation:crm-fade 0.2s ease;}
   .crm-detail-header{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;margin-bottom:36px;}
   .crm-detail-header-actions{display:flex;flex-direction:column;gap:8px;align-items:flex-end;flex-shrink:0;}
@@ -968,8 +1065,8 @@ const css = `
   .crm-reopen-btn{height:36px;padding:0 16px;border:1px solid var(--o20);border-radius:2px;background:var(--white);color:var(--o);font-family:var(--fb);font-size:12px;font-weight:500;cursor:pointer;transition:all 0.12s;}
   .crm-reopen-btn:hover:not(:disabled){background:var(--o);color:var(--white);}
   .crm-timestamps{font-family:var(--fm);font-size:11px;color:var(--o20);letter-spacing:0.04em;display:flex;align-items:center;gap:8px;margin-top:24px;}
-  .crm-feedback{font-size:12px;color:var(--o40);font-style:italic;} .crm-feedback--error{color:#ef4444;font-style:normal;font-weight:500;}
-  /* CREATE */
+  .crm-feedback{font-size:12px;color:var(--o40);font-style:italic;}
+  .crm-feedback--error{color:#ef4444;font-style:normal;font-weight:500;}
   .crm-create{padding:40px 48px 80px;max-width:620px;animation:crm-fade 0.2s ease;}
   .crm-create-header{margin-bottom:36px;}
   .crm-create-eyebrow{font-family:var(--fm);font-size:11px;color:var(--o30);letter-spacing:0.14em;text-transform:uppercase;margin-bottom:8px;}
@@ -1002,7 +1099,6 @@ const css = `
   .crm-toggle-card--disabled{opacity:0.4;cursor:not-allowed;}
   .crm-toggle-name{font-size:13px;font-weight:600;color:var(--o);margin-bottom:3px;}
   .crm-toggle-desc{font-size:11px;color:var(--o40);line-height:1.5;}
-  /* Automation section extras */
   .crm-auto-section{display:flex;flex-direction:column;gap:14px;}
   .crm-auto-intro{display:flex;align-items:flex-start;gap:10px;padding:12px 14px;background:var(--o05);border:1px solid var(--o12);border-radius:2px;}
   .crm-auto-intro-icon{color:var(--o);flex-shrink:0;margin-top:1px;}
@@ -1026,18 +1122,15 @@ const css = `
     .crm-metrics{flex-wrap:wrap;}
     .crm-success{padding:40px 20px;}
   }
-  /* AI auto-fill */
   .crm-title-row{display:flex;gap:8px;align-items:center;}
   .crm-title-row .crm-input{flex:1;}
   .crm-autofill-btn{height:42px;padding:0 14px;background:var(--o05);border:1px solid var(--o20);border-radius:2px;font-family:var(--fb);font-size:11px;font-weight:600;color:var(--o);cursor:pointer;white-space:nowrap;transition:all 0.12s;letter-spacing:0.04em;flex-shrink:0;}
   .crm-autofill-btn:hover:not(:disabled){background:var(--o);color:var(--white);border-color:var(--o);}
   .crm-autofill-btn:disabled{opacity:0.5;cursor:not-allowed;}
   .crm-autofill-btn--loading{opacity:0.7;}
-  /* AI match button */
   .crm-match-btn{height:36px;padding:0 14px;border:1px solid var(--o20);border-radius:2px;font-family:var(--fb);font-size:12px;font-weight:600;color:var(--o);background:var(--o05);cursor:pointer;white-space:nowrap;transition:all 0.12s;}
   .crm-match-btn:hover:not(:disabled){background:var(--o);color:var(--white);border-color:var(--o);}
   .crm-match-btn:disabled{opacity:0.5;cursor:not-allowed;}
-  /* AI match panel */
   .crm-match-panel{border:1px solid var(--o20);border-radius:2px;margin-bottom:32px;overflow:hidden;}
   .crm-match-panel-header{width:100%;display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--o05);border:none;cursor:pointer;font-family:var(--fb);}
   .crm-match-panel-header:hover{background:var(--o08);}
@@ -1050,6 +1143,10 @@ const css = `
   .crm-match-spinner{width:16px;height:16px;border:2px solid var(--o12);border-top-color:var(--o);border-radius:50%;animation:crm-spin 0.7s linear infinite;flex-shrink:0;}
   @keyframes crm-spin{to{transform:rotate(360deg)}}
   .crm-match-empty{padding:20px 16px;font-size:12px;color:var(--o30);font-style:italic;}
+  .crm-match-select-bar{display:flex;align-items:center;justify-content:space-between;padding:6px 16px 10px;border-bottom:1px solid var(--o08);}
+  .crm-match-select-all{background:none;border:none;font-family:var(--fb);font-size:11px;font-weight:600;color:var(--o40);cursor:pointer;padding:0;transition:color 0.1s;}
+  .crm-match-select-all:hover{color:var(--o);}
+  .crm-match-selected-count{font-family:var(--fm);font-size:10px;color:var(--o);background:var(--o08);border:1px solid var(--o20);border-radius:2px;padding:2px 8px;letter-spacing:0.04em;}
   .crm-match-list{display:flex;flex-direction:column;}
   .crm-match-card{display:flex;align-items:flex-start;gap:12px;padding:12px 16px;border-bottom:1px solid var(--o08);transition:background 0.1s;}
   .crm-match-card:last-child{border-bottom:none;}
@@ -1059,11 +1156,14 @@ const css = `
   .crm-match-top{display:flex;align-items:baseline;flex-wrap:wrap;gap:6px;margin-bottom:4px;}
   .crm-match-name{font-size:13px;font-weight:600;color:var(--o);}
   .crm-match-role{font-size:11px;color:var(--o40);}
+  .crm-match-exp{font-family:var(--fm);font-size:10px;color:var(--o30);}
   .crm-match-rec{font-family:var(--fm);font-size:9px;letter-spacing:0.08em;padding:2px 6px;border-radius:2px;font-weight:600;}
   .crm-match-rec--strong-hire,.crm-match-rec--hire{background:rgba(22,163,74,0.1);color:#15803d;border:1px solid rgba(22,163,74,0.2);}
   .crm-match-rec--interview{background:var(--o08);color:var(--o);border:1px solid var(--o20);}
   .crm-match-rec--maybe{background:rgba(234,179,8,0.1);color:#a16207;border:1px solid rgba(234,179,8,0.2);}
   .crm-match-rec--pass{background:rgba(239,68,68,0.08);color:#dc2626;border:1px solid rgba(239,68,68,0.15);}
+  .crm-match-has-email{font-family:var(--fm);font-size:9px;color:var(--o30);letter-spacing:0.03em;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .crm-match-no-email{font-family:var(--fm);font-size:9px;color:rgba(239,68,68,0.6);background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.12);border-radius:2px;padding:1px 5px;}
   .crm-match-explanation{font-size:12px;color:rgba(10,31,51,0.65);line-height:1.55;margin:0 0 6px;}
   .crm-match-tags-row{display:flex;flex-wrap:wrap;gap:4px;}
   .crm-match-tag{font-family:var(--fm);font-size:10px;padding:2px 7px;border-radius:2px;letter-spacing:0.03em;}
@@ -1072,4 +1172,11 @@ const css = `
   .crm-match-score-wrap{position:relative;width:44px;height:44px;flex-shrink:0;}
   .crm-match-score-ring{width:44px;height:44px;}
   .crm-match-score-num{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--fm);font-size:11px;font-weight:600;color:var(--o);}
+  /* ── Invite bar at bottom of match panel ── */
+  .crm-match-invite-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 16px;border-top:1px solid var(--o12);background:var(--o05);}
+  .crm-match-invite-hint{font-size:11px;color:var(--o40);margin:0;font-style:italic;}
+  .crm-match-invite-done{font-size:12px;color:var(--o);font-weight:600;margin:0;}
+  .crm-match-invite-btn{height:32px;padding:0 16px;background:var(--o);color:var(--white);border:none;border-radius:2px;font-family:var(--fb);font-size:11px;font-weight:600;letter-spacing:0.04em;cursor:pointer;white-space:nowrap;transition:all 0.12s;flex-shrink:0;}
+  .crm-match-invite-btn:hover:not(:disabled){opacity:0.85;}
+  .crm-match-invite-btn:disabled{background:var(--o20);cursor:not-allowed;}
 `;
