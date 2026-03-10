@@ -116,6 +116,7 @@
     "@types/humanize-duration": "^3.27.4",
     "@types/multer": "^2.0.0",
     "@types/node": "^20",
+    "@types/pdf-parse": "^1.1.5",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/react-highlight-words": "^0.20.0",

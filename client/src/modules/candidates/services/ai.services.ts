@@ -1,14 +1,11 @@
 import OpenAI from "openai";
 import { getFile } from "@/modules/candidates/services/file-storage";
-import { execSync } from 'child_process';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
+import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf";
+import { createCanvas } from "canvas";
+import * as pdfParseModule from "pdf-parse";
+const pdfParse = (pdfParseModule as any).default ?? pdfParseModule;
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 // HELPER: Retry logic for API calls
 async function callOpenAIWithRetry(requestFn: () => Promise<any>, maxRetries = 3): Promise<any> {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -46,52 +43,48 @@ function calculateCompletenessScore(analysis: any): number {
   return Math.max(0, score);
 }
 
-// Vision-enhanced PDF extraction with pdf-parse + Poppler
+
+// ─── keep callOpenAIWithRetry, calculateCompletenessScore EXACTLY as-is ───────
+
 export const extractTextFromPDF = async (fileKey: string) => {
   let totalCost = 0;
-  
+
   try {
-    const fileData = getFile(fileKey);
-    if (!fileData) {
-      throw new Error("File not found");
+    // ── Fetch file buffer ────────────────────────────────────────────────────
+    // fileKey is now a Vercel Blob URL — fetch it directly
+    let buffer: Buffer;
+    if (fileKey.startsWith("http://") || fileKey.startsWith("https://")) {
+      const res = await fetch(fileKey);
+      buffer = Buffer.from(await res.arrayBuffer());
+    } else {
+      const fileData = getFile(fileKey);
+      if (!fileData) throw new Error("File not found");
+      buffer = Buffer.from(fileData);
     }
 
     console.log("📄 Extracting text from CV/Resume PDF...");
-    
-    // Write to temp file
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pdf-'));
-    const pdfPath = path.join(tmpDir, 'input.pdf');
-    fs.writeFileSync(pdfPath, Buffer.from(fileData));
-    
-    // Use pdftotext from Poppler (you already have it installed)
-    const textOutput = execSync(`pdftotext "${pdfPath}" -`, { encoding: 'utf-8' });
-    
-    // Get page count
-    const infoOutput = execSync(`pdfinfo "${pdfPath}"`, { encoding: 'utf-8' });
-    const pageMatch = infoOutput.match(/Pages:\s+(\d+)/);
-    const numPages = pageMatch ? parseInt(pageMatch[1]) : 1;
-    
-    // Cleanup
-    fs.rmSync(tmpDir, { recursive: true, force: true });
-    
+
+    // ── Text extraction via pdf-parse (replaces pdftotext) ───────────────────
+    const parsed    = await pdfParse(buffer);
+    const textOutput = parsed.text ?? "";
+    const numPages   = parsed.numpages ?? 1;
     const totalChars = textOutput.length;
-    
+
     console.log("   Total pages:", numPages);
     console.log("   Text extracted:", totalChars, "characters");
-    
-    // Format with page markers
+
+    // Format with page markers (same structure as before)
     let text = "";
-    const pages = textOutput.split('\f');
-    
+    const pages = textOutput.split("\f");
     for (let i = 0; i < pages.length; i++) {
       text += `\n━━━ PAGE ${i + 1} START ━━━\n`;
       text += pages[i].trim() + "\n";
       text += `━━━ PAGE ${i + 1} END ━━━\n`;
     }
-    
+
     const avgCharsPerPage = totalChars / numPages;
-    
-    // Trigger Vision for any low-quality extraction, regardless of page count
+
+    // ── Vision fallback (replaces pdftoppm) ──────────────────────────────────
     if (avgCharsPerPage < 100 || totalChars < 200) {
       console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
       console.log("⚠️  LOW TEXT EXTRACTION DETECTED!");
@@ -99,56 +92,46 @@ export const extractTextFromPDF = async (fileKey: string) => {
       console.log("   Average chars/page:", Math.round(avgCharsPerPage));
       console.log("   Pages:", numPages);
       console.log("   This CV is likely image-based or scanned");
-      console.log("🔍 ACTIVATING VISION MODE WITH POPPLER...");
+      console.log("🔍 ACTIVATING VISION MODE WITH pdfjs-dist...");
       console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-      
+
       try {
-        const pagesToProcess = Math.min(numPages, 10); // CVs typically shorter than decks
-        
-        console.log(`📸 Converting ${pagesToProcess} pages to images using Poppler...`);
+        const pagesToProcess = Math.min(numPages, 10);
+        console.log(`📸 Converting ${pagesToProcess} pages to images using pdfjs-dist...`);
         console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-        
-        // Write PDF to a temp file
-        const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pdf-'));
-        const pdfPath = path.join(tmpDir, 'input.pdf');
-        fs.writeFileSync(pdfPath, Buffer.from(fileData));
 
-        const outputPrefix = path.join(tmpDir, 'page');
-
-        // Convert PDF pages to PNGs using Poppler
-        execSync(`pdftoppm -png -r 200 -f 1 -l ${pagesToProcess} "${pdfPath}" "${outputPrefix}"`);
-
-        // Read and encode images to base64
-        const imageFiles = fs.readdirSync(tmpDir)
-          .filter((f) => f.startsWith('page') && f.endsWith('.png'))
-          .sort();
-
+        const pdfDoc = await pdfjsLib.getDocument({ data: new Uint8Array(buffer) }).promise;
         const images: string[] = [];
+
         console.log("📊 PROGRESS TRACKING:");
 
-        for (let i = 0; i < imageFiles.length; i++) {
-          const imgBuffer = fs.readFileSync(path.join(tmpDir, imageFiles[i]));
-          images.push(imgBuffer.toString('base64'));
+        for (let i = 1; i <= pagesToProcess; i++) {
+          const page     = await pdfDoc.getPage(i);
+          const viewport = page.getViewport({ scale: 2.0 }); // ~200 DPI equivalent
+          const canvas   = createCanvas(viewport.width, viewport.height);
+          const context  = canvas.getContext("2d") as any;
 
-          const progress = Math.round(((i + 1) / imageFiles.length) * 100);
-          console.log(`   [${progress}%] Page ${i + 1}/${imageFiles.length} encoded`);
+          await page.render({ canvasContext: context, viewport }).promise;
+
+          const base64 = canvas.toBuffer("image/png").toString("base64");
+          images.push(base64);
+
+          const progress = Math.round((i / pagesToProcess) * 100);
+          console.log(`   [${progress}%] Page ${i}/${pagesToProcess} encoded`);
         }
 
-        // Cleanup temp files
-        fs.rmSync(tmpDir, { recursive: true, force: true });
-
         console.log(`   ✓ Converted ${images.length} pages to images`);
-        
+
         const visionCost = images.length * 0.00255;
         totalCost += visionCost;
-        
+
         console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
         console.log("📤 Sending to GPT-4o Vision API...");
         console.log(`   Images: ${images.length}`);
         console.log(`   Vision cost: $${visionCost.toFixed(4)}`);
         console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-        
-        // Build Vision API request
+
+        // ── Vision API call — identical to original ──────────────────────────
         const visionContent: any[] = [
           {
             type: "text",
@@ -167,75 +150,64 @@ Format your response EXACTLY like this:
 Extract EVERY word, number, date, and detail. Don't summarize.`
           }
         ];
-        
-        // Add all images
+
         images.forEach((base64) => {
           visionContent.push({
             type: "image_url",
-            image_url: {
-              url: `data:image/png;base64,${base64}`,
-              detail: "high"
-            }
+            image_url: { url: `data:image/png;base64,${base64}`, detail: "high" }
           });
         });
-        
-        // Call Vision API with retry logic
+
         const visionResponse = await callOpenAIWithRetry(() =>
           openai.chat.completions.create({
             model: "gpt-4o",
             messages: [{ role: "user", content: visionContent }],
             max_tokens: 16000,
-            temperature: 0.1
+            temperature: 0.1,
           })
         );
-        
+
         const visionText = visionResponse.choices[0].message.content || "";
-        
+
         console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
         console.log("✅ VISION EXTRACTION COMPLETE");
         console.log("   Extracted:", visionText.length, "characters");
         console.log("   Original:", totalChars, "characters");
         console.log("   Improvement:", Math.round((visionText.length / Math.max(totalChars, 1)) * 100), "%");
         console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-        
+
         if (visionText.length > totalChars * 1.5) {
           console.log("✅ Using Vision extraction (much better!)");
           return visionText;
         } else {
           console.log("⚠️  Vision didn't improve extraction significantly, using original");
         }
-        
+
       } catch (visionError: any) {
         console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
         console.log("❌ VISION EXTRACTION FAILED");
         console.log("   Error:", visionError.message || visionError);
-        
-        if (visionError.message?.includes("pdftoppm")) {
-          console.log("");
-          console.log("💡 SOLUTION:");
-          console.log("   Install Poppler: brew install poppler");
-          console.log("");
-        } else if (visionError.status === 429) {
+
+        if (visionError.status === 429) {
           console.log("   Rate limit hit. Try again in a few minutes.");
         } else if (visionError.status === 400) {
           console.log("   Image format issue. PDF may be corrupted.");
         }
-        
+
         console.log("⚠️  Falling back to text extraction");
-        
+
         if (totalChars < 500) {
           console.log("⚠️⚠️⚠️ WARNING: Analysis quality will be significantly reduced!");
           console.log("   Only", totalChars, "chars extracted from", numPages, "pages");
         }
-        
+
         console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
       }
     }
-    
+
     console.log("✅ Text extraction complete");
     console.log(`💰 Extraction cost: $${totalCost.toFixed(4)}`);
-    
-    // Final check - warn if extraction is still very poor
+
     if (text.length < 200) {
       console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
       console.log("⚠️⚠️⚠️ CRITICAL WARNING ⚠️⚠️⚠️");
@@ -243,19 +215,21 @@ Extract EVERY word, number, date, and detail. Don't summarize.`
       console.log("   CV analysis will be VERY LIMITED or may fail");
       console.log("   Possible causes:");
       console.log("   1. PDF is corrupted");
-      console.log("   2. Vision mode failed (check Poppler installation)");
+      console.log("   2. Vision mode failed");
       console.log("   3. File is not a valid PDF");
       console.log("   4. PDF is password protected");
       console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     }
-    
+
     return text;
-    
+
   } catch (error) {
     console.log(error);
     throw new Error("Failed to extract text from CV PDF");
   }
 };
+
+// ─── extractCandidateInfo and analyzeCVWithAI stay 100% identical ─────────────
 
 export const extractCandidateInfo = async (cvText: string): Promise<{
   name?: string;
