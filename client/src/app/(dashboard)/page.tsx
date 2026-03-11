@@ -186,7 +186,7 @@ export default function HRAILanding() {
                 Get Early Access
               </motion.button>
               <motion.button
-                onClick={() => window.open("https://drive.google.com/file/d/1chBw97mGlFh_R3KiqnGA61NC8CVx8V_D/view?usp=drivesdk", "_blank")}
+                onClick={() => window.open("https://drive.google.com/file/d/1Mq85la6DwwXF-eKkMNTP-4PmBYZyhQbg/view?usp=sharing", "_blank")}
                 whileHover={{ scale: 1.04, backgroundColor: "#FF6A00", color: "#FFFFFF" }} whileTap={{ scale: 0.96 }}
                 className="w-full sm:w-auto px-7 md:px-9 h-12 border-2 border-[#FF6A00] text-[#FF6A00] text-xs md:text-sm tracking-widest uppercase font-light transition-all"
               >
