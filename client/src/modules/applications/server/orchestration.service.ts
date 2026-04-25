@@ -4,8 +4,8 @@
 // DB insert shape copied exactly from candidates router analyzeCV mutation.
 
 import { db } from "@/db";
-import { applications, jobListings, cvAnalysis, meetings, agents } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { applications, jobListings, cvAnalysis, meetings, agents, meetingTypes } from "@/db/schema";
+import { and, eq } from "drizzle-orm";
 import { extractTextFromPDF, extractCandidateInfo, analyzeCVWithAI } from "@/modules/candidates/services/ai.services";
 import { storeFile, deleteFile } from "@/modules/candidates/services/file-storage";
 import { sanitizeAnalysisData } from "@/modules/candidates/controllers/cv.controllers";
@@ -188,56 +188,46 @@ export async function runOrchestrationPipeline(params: {
       };
     }
 
-    // ── 6. Create meeting (agent already loaded above) ───────────────────────
-    let savedMeetingId: string | null = null;
+    // ── 6. Determine Scheduling Link (Replacement for direct meeting) ────────
     let meetingLink: string | null = null;
+    let savedMeetingId: string | null = null; // Will remain null as we don't create meeting yet
 
     try {
-      const meetingName = `${params.candidateName} — ${job.title} Interview`;
+      // Find the recruiter's default meeting type to send a scheduling link
+      const [mt] = await db
+        .select()
+        .from(meetingTypes)
+        .where(
+          and(
+            eq(meetingTypes.hostId, params.recruiterId),
+            eq(meetingTypes.isDefault, true)
+          )
+        );
 
-      const [newMeeting] = await db
-        .insert(meetings)
-        .values({
-          name:         meetingName,
-          userId:       params.recruiterId,
-          agentId:      job.agentId!,
-          cvAnalysisId: savedAnalysisId,
-          status:       "upcoming",
-        })
-        .returning();
-
-      savedMeetingId = newMeeting.id;
-      meetingLink    = `${process.env.NEXT_PUBLIC_APP_URL}/meeting-call/${savedMeetingId}`;
-
-      // Create Stream Video call
-      const call = streamVideo.video.call("default", savedMeetingId);
-      await call.create({
-        data: {
-          created_by_id: params.recruiterId,
-          custom:        { meetingId: savedMeetingId, meetingName },
-          settings_override: {
-            transcription: { language: "auto", mode: "auto-on", closed_caption_mode: "auto-on" },
-            recording:     { mode: "auto-on", quality: "1080p" },
-          },
-        },
-      });
-
-      // Upsert agent as Stream user
-      await streamVideo.upsertUsers([{
-        id:    agent.id,
-        name:  agent.name,
-        role:  "user",
-        image: GeneratdAvatarUri({ seed: agent.name, variant: "initials" }),
-      }]);
+      if (mt) {
+        meetingLink = `${process.env.NEXT_PUBLIC_APP_URL}/schedule/${mt.slug}`;
+        console.log(`[orchestration] Scheduling link generated: ${meetingLink}`);
+      } else {
+          // Fallback to searching for the first available meeting type if no default is marked
+          const [firstMt] = await db
+            .select()
+            .from(meetingTypes)
+            .where(eq(meetingTypes.hostId, params.recruiterId));
+          
+          if (firstMt) {
+            meetingLink = `${process.env.NEXT_PUBLIC_APP_URL}/schedule/${firstMt.slug}`;
+            console.log(`[orchestration] Fallback scheduling link generated: ${meetingLink}`);
+          } else {
+            console.warn(`[orchestration] No meeting types found for recruiter ${params.recruiterId}. Cannot send scheduling link.`);
+          }
+      }
 
       await db
         .update(applications)
-        .set({ meetingId: savedMeetingId, autoHandled: true })
+        .set({ autoHandled: true })
         .where(eq(applications.id, params.applicationId));
-
-      console.log(`[orchestration] Meeting created: ${savedMeetingId}`);
     } catch (err: any) {
-      console.error("[orchestration] Meeting creation failed:", err.message);
+      console.error("[orchestration] Scheduling link generation failed:", err.message);
     }
 
     // ── 8. Send Plunk email ───────────────────────────────────────────────────

@@ -17,6 +17,19 @@ export const auth = betterAuth({
         google: {
             clientId: process.env.GOOGLE_CLIENT_ID!,
             clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+            scope: [
+                "https://www.googleapis.com/auth/calendar.events",
+                "https://www.googleapis.com/auth/calendar.readonly",
+                "openid",
+                "profile",
+                "email"
+            ],
+            mapURL: (url: string) => {
+                const newUrl = new URL(url);
+                newUrl.searchParams.set("access_type", "offline");
+                newUrl.searchParams.set("prompt", "consent");
+                return newUrl.toString();
+            }
         }
     },
     emailAndPassword: {

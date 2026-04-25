@@ -5,6 +5,7 @@ import { meetingsRouter } from '@/modules/meetings/server/procedures';
 import { candidatesRouter } from '@/modules/candidates/server/procedures';
 import { jobsRouter } from '@/modules/jobs/server/procedure';
 import { applicationsRouter } from '@/modules/applications/server/procedures';
+import { schedulingRouter } from '@/modules/scheduling/server/procedures';
 
 
 export const appRouter = createTRPCRouter({
@@ -13,6 +14,7 @@ export const appRouter = createTRPCRouter({
    candidates: candidatesRouter,
    jobs: jobsRouter,
    applications: applicationsRouter,
+   scheduling: schedulingRouter,
 });
 
 export type AppRouter = typeof appRouter;

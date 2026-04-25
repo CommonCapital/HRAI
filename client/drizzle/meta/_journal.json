@@ -15,6 +15,13 @@
       "when": 1772447848933,
       "tag": "0001_tricky_risque",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1777034640303,
+      "tag": "0002_wonderful_songbird",
+      "breakpoints": true
     }
   ]
 }

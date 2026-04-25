@@ -9,6 +9,8 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 
+import { SettingsView } from "@/modules/settings/ui/view/SettingsView";
+
 const Page = async() => {
     const session = await auth.api.getSession({
      headers: await headers(),
@@ -18,17 +20,17 @@ const Page = async() => {
        redirect("/auth/sign-in")
     };
     const queryClient = getQueryClient();
-    //void queryClient.prefetchQuery(
-     //   trpc.premium.getCurrentSubscription.queryOptions(),
-    //)
-    //void queryClient.prefetchQuery(
-      //  trpc.premium.getProducts.queryOptions(),
-    //)
+    
+    // Prefetch connected accounts for seamless loading
+    void queryClient.prefetchQuery(
+        trpc.scheduling.getConnectedAccounts.queryOptions()
+    );
+
     return (
      <HydrationBoundary state={dehydrate(queryClient)}>
        <Suspense fallback={<LoadingPage />}>
         <ErrorBoundary fallback={<ErrorPage />}>
-            Settings
+            <SettingsView />
         </ErrorBoundary>
        </Suspense>
      </HydrationBoundary>

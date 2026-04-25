@@ -778,3 +778,66 @@ export type CandidateExperience = typeof candidateExperiences.$inferSelect;
 export type CandidateEducation = typeof candidateEducation.$inferSelect;
 export type CandidateCertification = typeof candidateCertifications.$inferSelect;
 export type CandidateResume = typeof candidateResumes.$inferSelect;
+
+// ─── Scheduling (Calendly-Clone Migration) ────────────────────────────────────
+
+export const availabilitySlots = pgTable("availability_slots", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => nanoid()),
+  userId: text("user_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  dayOfWeek: text("day_of_week").notNull(), // "monday", "tuesday", etc.
+  startTime: text("start_time").notNull(), // e.g., "09:00"
+  endTime: text("end_time").notNull(), // e.g., "17:00"
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const meetingTypes = pgTable("meeting_types", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => nanoid()),
+  hostId: text("host_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  slug: text("slug").notNull(),
+  duration: integer("duration").notNull().default(30),
+  description: text("description"),
+  isDefault: boolean("is_default").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at")
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date()),
+});
+
+export const bookings = pgTable("bookings", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => nanoid()),
+  meetingTypeId: text("meeting_type_id")
+    .notNull()
+    .references(() => meetingTypes.id, { onDelete: "cascade" }),
+  attendeeName: text("attendee_name").notNull(),
+  attendeeEmail: text("attendee_email").notNull(),
+  date: timestamp("date").notNull(),
+  startTime: text("start_time").notNull(),
+  endTime: text("end_time").notNull(),
+  status: text("status").notNull().default("scheduled"), // e.g., scheduled, cancelled
+  meetLink: text("meet_link"),
+  googleEventId: text("google_event_id"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at")
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date()),
+});
+
+export type AvailabilitySlot = typeof availabilitySlots.$inferSelect;
+export type NewAvailabilitySlot = typeof availabilitySlots.$inferInsert;
+export type MeetingType = typeof meetingTypes.$inferSelect;
+export type NewMeetingType = typeof meetingTypes.$inferInsert;
+export type Booking = typeof bookings.$inferSelect;
+export type NewBooking = typeof bookings.$inferInsert;

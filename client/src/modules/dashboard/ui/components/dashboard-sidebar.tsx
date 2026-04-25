@@ -11,7 +11,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { BotIcon, Contact, File, FileText, FolderSync, FormInput, Home, LayoutDashboard, Settings, StarIcon, User, VideoIcon } from "lucide-react";
+import { BotIcon, Calendar, Contact, File, FileText, FolderSync, FormInput, Home, LayoutDashboard, Settings, StarIcon, User, VideoIcon } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { Separator } from "@/components/ui/separator";
@@ -24,46 +24,46 @@ import { DashboardTrial } from "./dashboard-trial";
 const HRAILogo = ({ size = 40 }: { size?: number }) => {
   return (
     <div className="flex items-center gap-3">
-      <svg 
-        width={size} 
-        height={size} 
-        viewBox="0 0 40 40" 
-        fill="none" 
+      <svg
+        width={size}
+        height={size}
+        viewBox="0 0 40 40"
+        fill="none"
         xmlns="http://www.w3.org/2000/svg"
         className="flex-shrink-0"
       >
         {/* Outer frame - represents structure */}
-        <rect 
-          x="2" 
-          y="2" 
-          width="36" 
-          height="36" 
-          stroke="#FF6A00" 
+        <rect
+          x="2"
+          y="2"
+          width="36"
+          height="36"
+          stroke="#FF6A00"
           strokeWidth="2"
           fill="none"
         />
-        
+
         {/* Inner geometric pattern - represents AI intelligence */}
-        <path 
-          d="M 20 8 L 32 14 L 32 26 L 20 32 L 8 26 L 8 14 Z" 
+        <path
+          d="M 20 8 L 32 14 L 32 26 L 20 32 L 8 26 L 8 14 Z"
           fill="#FF6A00"
         />
-        
+
         {/* Central node - represents decision point */}
-        <circle 
-          cx="20" 
-          cy="20" 
-          r="4" 
+        <circle
+          cx="20"
+          cy="20"
+          r="4"
           fill="white"
         />
-        
+
         {/* Connection lines - represents autonomous workflow */}
         <line x1="20" y1="8" x2="20" y2="16" stroke="white" strokeWidth="1.5" />
         <line x1="20" y1="24" x2="20" y2="32" stroke="white" strokeWidth="1.5" />
         <line x1="8" y1="14" x2="16" y2="18" stroke="white" strokeWidth="1.5" />
         <line x1="24" y1="22" x2="32" y2="26" stroke="white" strokeWidth="1.5" />
       </svg>
-      
+
       <div className="flex flex-col leading-none">
         <span className="text-xl font-semibold tracking-tight text-primary">HRAI</span>
         <span className="text-[10px] uppercase tracking-widest font-light opacity-60 mt-0.5">
@@ -88,7 +88,7 @@ const firstSection = [
   {
     icon: FolderSync,
     label: "Applications",
-href: "/jobs"
+    href: "/jobs"
   },
   {
     icon: File,
@@ -96,11 +96,11 @@ href: "/jobs"
     href: "/user-contract",
   },
   {
-    icon: VideoIcon,
-    label: "Meetings",
-    href: "/meetings",
+    icon: Calendar,
+    label: "Calendar",
+    href: "/scheduling",
   },
-  
+
   {
     icon: Contact,
     label: "CRM-System",
@@ -118,7 +118,7 @@ const secondSection = [
 
 export const DashboardSidebar = () => {
   const pathname = usePathname();
-  
+
   return (
     <Sidebar className="bg-white border-r-2 border-primary/10">
       <SidebarHeader className="bg-white border-b border-primary/10">
@@ -126,11 +126,11 @@ export const DashboardSidebar = () => {
           <HRAILogo size={40} />
         </Link>
       </SidebarHeader>
-      
+
       <div className="px-4 py-2">
         <Separator className="bg-primary/10 h-[1px]" />
       </div>
-      
+
       <SidebarContent className="bg-white">
         <SidebarGroup>
           <SidebarGroupContent>
