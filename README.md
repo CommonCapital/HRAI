@@ -9,6 +9,7 @@ HRAI is a high-performance recruitment platform that transforms hiring from a ma
 *   **CRM Sorting**: Candidates are instantly ranked in your dashboard from top-to-bottom based on their AI score—no manual screening required.
 *   **Smart Deferral**: If a job has a deadline, invitations are intelligently held back to allow the full pool of talent to be evaluated.
 
+
 ### 2. Proactive Talent Discovery (AI-fetch)
 *   **Pull from DB**: Instead of paying for new leads, recruiters can proactively scan their entire historical database for candidates matching a new role's specific requirements.
 *   **Cross-Job Matching**: Rediscover "lost gems" who applied for previous roles but are a perfect fit for your current needs.
