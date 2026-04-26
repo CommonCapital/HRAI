@@ -1,92 +1,64 @@
-# HRAI — AI-Powered HR Orchestration Engine
+# HRAI — The AI-First Recruitment Orchestration Engine
 
-HRAI is a modern recruitment automation platform designed to streamline the hiring process from application to interview. By leveraging AI-driven CV analysis and automated scheduling, HRAI enables recruiters to focus on talent while the engine handles the orchestration.
+HRAI is a high-performance recruitment platform that transforms hiring from a manual chore into an automated, merit-driven engine. By combining **GPT-4o CV Orchestration**, **Proactive Talent Discovery**, and **Strategic Batch Invitations**, HRAI ensures your team only spends time with the absolute best talent.
 
-## 🚀 Key Features
+## 🚀 The Core Workflows
 
-### 🧠 AI Orchestration Engine
-- **Automated CV Analysis**: Leveraging GPT-4o to analyze candidate resumes against specific job criteria and agent instructions.
-- **Smart Screening**: Automatic "Strong Hire" / "Interview" threshold detection to trigger follow-up actions.
-- **Pipeline Automation**: Seamlessly moves candidates from "Submitted" to "In Review" or "Shortlisted" based on AI recommendations.
+### 1. The Automated "Submission-to-Invite" Loop
+*   **Instant Analysis**: Every candidate submission triggers a GPT-4o analysis that extracts skills, assesses experience, and assigns an **AI Score (0-100)**.
+*   **CRM Sorting**: Candidates are instantly ranked in your dashboard from top-to-bottom based on their AI score—no manual screening required.
+*   **Smart Deferral**: If a job has a deadline, invitations are intelligently held back to allow the full pool of talent to be evaluated.
 
-### 📅 Advanced Scheduling System
-- **Google Calendar Integration**: Direct OAuth 2.0 integration for real-time availability synchronization.
-- **Google Meet Automation**: Automatic generation of unique meeting links for every scheduled interview.
-- **Visual Availability Dashboard**: A powerful "drag-and-drop" calendar for recruiters to manage their weekly availability.
-- **Public Booking Pages**: Professional, high-speed booking links for candidates to select times that work for both parties.
+### 2. Proactive Talent Discovery (AI-fetch)
+*   **Pull from DB**: Instead of paying for new leads, recruiters can proactively scan their entire historical database for candidates matching a new role's specific requirements.
+*   **Cross-Job Matching**: Rediscover "lost gems" who applied for previous roles but are a perfect fit for your current needs.
 
-### 💼 Recruiter Dashboard
-- **Modern Aesthetic**: High-contrast "Orange & White" premium design system optimized for speed and clarity.
-- **Job Management**: Complete control over job listings, agent instructions, and auto-orchestration toggles.
-- **Interactive Analytics**: Quick insights into application counts and candidate status.
+### 3. Strategic Deadline Batching
+*   **Top-N Selection**: Once a job deadline is reached, the system automatically dispatches booking invitations only to the **Top N** ranked candidates.
+*   **Automated Scheduling**: Candidates receive personalized links to book interviews via your **Google Meet-integrated** calendar.
+
+---
+
+## 🧠 Key Features
+
+### 🧠 Intelligent Automation
+- **Smart AI-autofill**: Recruiters can generate full job descriptions and AI Agent instructions from a simple title.
+- **Candidate AI Assist**: Applicants can use AI to refine their motivation statements and skills based on the job requirements.
+- **Full Orchestration**: Move candidates from "Applied" to "Interview Scheduled" with zero manual clicks.
+
+### 📅 Advanced Scheduling
+- **Google Calendar/Meet Sync**: Real-time availability sync and automatic unique meeting link generation.
+- **Recruiter Dashboard**: High-speed availability management and a professional "Orange & White" glassmorphism UI.
+
+---
 
 ## 🛠 Tech Stack
 
-- **Framework**: Next.js 15 (App Router)
-- **Language**: TypeScript / React 19
-- **API layer**: tRPC (Type-safe RPC)
-- **Database**: PostgreSQL with Drizzle ORM
-- **Authentication**: Better-Auth with Google OAuth
-- **State Management**: TanStack Query (React Query)
-- **Styling**: Vanilla CSS with Design Tokens & Lucide Icons
-- **AI/ML**: OpenAI GPT-4o for document extraction and analysis
-- **Mailing**: Plunk (AWS SES based)
+- **Framework**: Next.js 15 (App Router) & React 19
+- **API**: tRPC (Type-safe RPC) for seamless client-server communication.
+- **Database**: PostgreSQL with Drizzle ORM.
+- **Workflows**: Inngest for reliable, event-driven background processing and cron-jobs.
+- **AI**: OpenAI GPT-4o for deep document extraction and merit-based ranking.
+- **Auth**: Better-Auth with Google OAuth 2.0.
 
-## 📦 Project Structure
-
-```text
-src/
-├── app/               # Next.js 15 App Router (Pages & API)
-├── modules/           # Feature-driven module architecture
-│   ├── jobs/          # Job management UI and logic
-│   ├── scheduling/    # Calendar, booking, and Google integration
-│   ├── candidates/    # CV analysis and AI services
-│   ├── applications/  # Orchestration engine and pipeline logic
-│   └── agents/        # AI Agent configuration
-├── components/        # Shared UI components (Brutalist theme)
-├── db/                # Drizzle schema and database configuration
-├── lib/               # Shared utilities (Auth, Stream, etc.)
-└── trpc/              # Type-safe API client and procedures
-```
+---
 
 ## 🛠 Setup & Installation
 
-1. **Clone the repository**:
-   ```bash
-   git clone [repository-url]
-   cd HRAI/client
-   ```
-
-2. **Install dependencies**:
+1. **Install dependencies**:
    ```bash
    npm install
    ```
 
-3. **Configure Environment Variables**:
-   Create a `.env` file in the root directory:
-   ```env
-   # Database
-   DATABASE_URL=postgresql://...
+2. **Configure Environment Variables**:
+   Create a `.env` file with your `DATABASE_URL`, `OPENAI_API_KEY`, `PLUNK_API_KEY`, and Google OAuth credentials.
 
-   # Auth
-   BETTER_AUTH_SECRET=...
-   NEXT_PUBLIC_APP_URL=http://localhost:3000
-
-   # Google API (for Calendars/Meet)
-   GOOGLE_CLIENT_ID=...
-   GOOGLE_CLIENT_SECRET=...
-
-   # AI & Email
-   OPENAI_API_KEY=...
-   PLUNK_API_KEY=...
-   ```
-
-4. **Synchronize Database**:
+3. **Synchronize Database**:
    ```bash
    npm run db:push
    ```
 
-5. **Start Development Server**:
+4. **Start Development Server**:
    ```bash
    npm run dev
    ```
