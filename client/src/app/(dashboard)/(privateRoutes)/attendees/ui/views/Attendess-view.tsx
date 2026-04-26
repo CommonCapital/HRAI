@@ -289,7 +289,22 @@ export function AttendeesView() {
                       {/* AI Score chip */}
                       <td>
                         {app.cvAnalysisId
-                          ? <span className="at-ai-chip at-ai-chip--done"><Brain size={10} className="mr-0.5 inline" />Done</span>
+                          ? (
+                            <div className="flex flex-col gap-1">
+                              <span className="at-ai-chip at-ai-chip--done">
+                                <Brain size={10} className="mr-0.5 inline" />
+                                { (app as any).aiScore ?? "Done" }
+                              </span>
+                              { (app as any).aiScore != null && (
+                                <div className="w-full bg-orange-100 h-1 rounded-full overflow-hidden">
+                                  <div 
+                                    className="bg-orange-500 h-full transition-all duration-500" 
+                                    style={{ width: `${(app as any).aiScore}%` }} 
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          )
                           : app.autoHandled
                             ? <span className="at-ai-chip at-ai-chip--skipped">Skipped</span>
                             : <span className="at-ai-chip at-ai-chip--pending">Pending</span>

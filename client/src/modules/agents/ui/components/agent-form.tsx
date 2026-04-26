@@ -66,13 +66,16 @@ export const AgentForm = ({
     }),
   );
 
+  const autoFillAgent = useMutation(
+    trpc.agents.autoFill.mutationOptions(),
+  );
+
   const form = useForm<z.infer<typeof agentsInsertSchema>>({
     resolver: zodResolver(agentsInsertSchema),
     defaultValues: {
       name: initialValues?.name ?? "",
       agentType: initialValues?.agentType ?? "active", // 🆕 NEW
       instructions: initialValues?.instructions ?? "",
-      instructions2: initialValues?.instructions2 ?? ""
     },
   });
 
@@ -193,9 +196,39 @@ export const AgentForm = ({
             control={form.control}
             render={({ field }) => (
               <FormItem>
-                <FormLabel className="text-sm font-semibold text-primary tracking-tight">
-                  Training Data
-                </FormLabel>
+                <div className="flex items-center justify-between">
+                  <FormLabel className="text-sm font-semibold text-primary tracking-tight">
+                    Training Data
+                  </FormLabel>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 px-2 text-[10px] uppercase tracking-wider text-orange-500 hover:text-orange-600 hover:bg-orange-50"
+                    onClick={async () => {
+                      const name = form.getValues("name");
+                      if (!name) {
+                        toast.error("Please enter an agent name first");
+                        return;
+                      }
+                      const promise = autoFillAgent.mutateAsync({ 
+                        name,
+                        instructions: form.getValues("instructions")
+                      });
+                      toast.promise(promise, {
+                        loading: "AI is thinking...",
+                        success: (data: any) => {
+                          form.setValue("instructions", data.instructions);
+                          if (data.name) form.setValue("name", data.name);
+                          return "Agent instructions improved!";
+                        },
+                        error: "Failed to generate instructions",
+                      });
+                    }}
+                  >
+                    ✨ Smart AI-autofill
+                  </Button>
+                </div>
                 <FormControl>
                   <Textarea 
                     className="min-h-[200px] max-h-[400px] overflow-y-auto resize-none border-primary/30 focus:border-primary font-light text-sm leading-relaxed"
@@ -205,30 +238,6 @@ export const AgentForm = ({
                 </FormControl>
                 <p className="text-xs font-light opacity-60 mt-2">
                   This defines how your agent evaluates candidates and makes decisions.
-                </p>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          {/* Report Template */}
-          <FormField
-            name="instructions2"
-            control={form.control}
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="text-sm font-semibold text-primary tracking-tight">
-                  Report Template
-                </FormLabel>
-                <FormControl>
-                  <Textarea 
-                    className="min-h-[200px] max-h-[400px] overflow-y-auto resize-none border-primary/30 focus:border-primary font-light text-sm leading-relaxed"
-                    {...field} 
-                    placeholder="Define the structure and format of evaluation reports..."
-                  />
-                </FormControl>
-                <p className="text-xs font-light opacity-60 mt-2">
-                  This defines the format of insights and recommendations your agent produces.
                 </p>
                 <FormMessage />
               </FormItem>

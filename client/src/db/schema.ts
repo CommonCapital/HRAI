@@ -74,7 +74,7 @@ export const agents = pgTable("agents", {
   .references(() => user.id, { onDelete: "cascade"}),
   agentType: agentTypeEnum("agent_type").notNull().default("active"),
   instructions: text("instructions").notNull(),
-  instructions2: text("instructions2").notNull(),
+  instructions2: text("instructions2"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
@@ -620,6 +620,8 @@ autoOrchestrate:  boolean("auto_orchestrate").default(false),
   postedByUserId: text("posted_by_user_id")
     .notNull()
     .references(() => user.id, { onDelete: "cascade" }),
+  applicationDeadline: timestamp("application_deadline"),
+  topCandidateLimit: integer("top_candidate_limit").default(10),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at")
     .notNull()

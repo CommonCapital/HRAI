@@ -121,7 +121,6 @@ export const agentsRouter = createTRPCRouter({
   create: protectedProcedure
     .input(agentsInsertSchema)
     .mutation(async ({ input, ctx }) => {
-      const {name, instructions, instructions2} = input;
       const {auth} = ctx;
       const [createdAgent] = await db
         .insert(agents)
@@ -132,5 +131,57 @@ export const agentsRouter = createTRPCRouter({
         .returning();
 
       return createdAgent;
+    }),
+
+  autoFill: protectedProcedure
+    .input(z.object({ 
+      name: z.string().optional(),
+      instructions: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      if (!process.env.OPENAI_API_KEY) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "OPENAI_API_KEY not set." });
+      }
+
+      const OpenAI = (await import("openai")).default;
+      const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are an expert AI persona designer. Based on the agent name and any partial instructions, generate a detailed, professional set of instructions for an HR AI agent. The instructions should define the agent's tone, goals, and specific evaluation criteria for candidate screening. Return only valid JSON.",
+          },
+          {
+            role: "user",
+            content: `Complete/Improve these agent instructions:
+Name: ${input.name || "HR Assistant"}
+Current Instructions: ${input.instructions || "None"}
+
+Return ONLY a valid JSON object with these exact fields:
+{
+  "name": "Improved agent name",
+  "instructions": "Comprehensive instructions for the AI agent (2-3 paragraphs). Focus on evaluation style, tone of voice, and what to look for in candidates."
+}`,
+          },
+        ],
+        response_format: { type: "json_object" },
+        temperature: 0.7,
+        max_tokens:  1000,
+      });
+
+      const raw = completion.choices[0].message.content ?? "{}";
+
+      try {
+        const data = JSON.parse(raw);
+        return {
+          name:         typeof data.name         === "string" ? data.name         : input.name || "",
+          instructions: typeof data.instructions === "string" ? data.instructions : input.instructions || "",
+        };
+      } catch {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "AI returned invalid response." });
+      }
     }),
 });

@@ -1,6 +1,6 @@
 import {serve} from "inngest/next";
 import {inngest} from "../../../inngest/client";
-import { meetingsProcessing, orchestrateApplication } from "@/inngest/functions";
+import { meetingsProcessing, orchestrateApplication, jobDeadlineReached } from "@/inngest/functions";
 
 
 export const {GET,POST,PUT} = serve({
@@ -8,5 +8,6 @@ export const {GET,POST,PUT} = serve({
     functions: [
      meetingsProcessing,
      orchestrateApplication,
+     jobDeadlineReached,
     ],
 });

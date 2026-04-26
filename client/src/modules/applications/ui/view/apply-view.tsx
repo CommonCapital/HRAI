@@ -168,6 +168,10 @@ export function ApplyView({ jobId }: { jobId: string }) {
     }),
   );
 
+  const autoFill = useMutation(
+    trpc.applications.autoFill.mutationOptions(),
+  );
+
   const form = useForm<FormValues>({
     defaultValues: {
       fullName: "", email: "", phone: "", locationCity: "",
@@ -389,6 +393,37 @@ export function ApplyView({ jobId }: { jobId: string }) {
                     required
                     hint="Tell us what excites you about this position"
                     error={form.formState.errors.motivation?.message}
+                    rightSlot={
+                      <button
+                        type="button"
+                        className="az-ai-btn"
+                        onClick={async () => {
+                          const currentRole = form.getValues("currentRole");
+                          if (!currentRole) {
+                            setErrorMsg("Please enter your current role first so the AI can tailor your motivation.");
+                            setSubmitStatus("error");
+                            return;
+                          }
+                          const promise = autoFill.mutateAsync({
+                            jobId,
+                            currentRole,
+                            skills: form.getValues("skills"),
+                            motivation: form.getValues("motivation"),
+                          });
+                          try {
+                            const data: any = await promise;
+                            form.setValue("motivation", data.motivation);
+                            form.setValue("skills", data.skills);
+                            setSubmitStatus("idle");
+                          } catch (e: any) {
+                            setErrorMsg("AI auto-fill failed: " + e.message);
+                            setSubmitStatus("error");
+                          }
+                        }}
+                      >
+                        [AI] Smart Auto-fill
+                      </button>
+                    }
                   >
                     <div className="az-icon-textarea-wrap">
                       <Lightbulb size={15} className="az-textarea-icon" />
@@ -496,12 +531,15 @@ function AzSection({ icon, title, num, alt = false, children }: {
   );
 }
 
-function AzField({ label, required, hint, error, children }: {
-  label: string; required?: boolean; hint?: string; error?: string; children: React.ReactNode;
+function AzField({ label, required, hint, error, rightSlot, children }: {
+  label: string; required?: boolean; hint?: string; error?: string; rightSlot?: React.ReactNode; children: React.ReactNode;
 }) {
   return (
     <div className="az-field">
-      <label className="az-field-label">{label}{required && <span className="az-req"> *</span>}</label>
+      <div className="flex items-center justify-between">
+        <label className="az-field-label">{label}{required && <span className="az-req"> *</span>}</label>
+        {rightSlot}
+      </div>
       {children}
       {hint && !error && <p className="az-field-hint">{hint}</p>}
       {error && <p className="az-err">{error}</p>}
@@ -542,6 +580,8 @@ const css = `
     --fm: 'DM Mono', monospace;
     min-height:100vh; background:var(--g50); font-family:var(--fb); color:var(--g900);
   }
+  .az-ai-btn { background:none; border:none; font-family:var(--fm); font-size:10px; color:var(--o); cursor:pointer; padding:0; letter-spacing:0.04em; text-transform:uppercase; transition:opacity 0.1s; }
+  .az-ai-btn:hover { opacity:0.7; }
 
   /* Header */
   .az-header { background:#fff; border-bottom:1px solid var(--g200); position:sticky; top:0; z-index:50; }

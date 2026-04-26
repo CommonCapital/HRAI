@@ -4,6 +4,7 @@ import { z } from "zod";
 import { db } from "@/db";
 import { createTRPCRouter, protectedProcedure, baseProcedure } from "@/trpc/init";
 import { applications, jobListings, notifications } from "@/db/schema";
+import { inngest } from "@/inngest/client";
 
 // ─── Shared validators ────────────────────────────────────────────────────────
 
@@ -18,18 +19,20 @@ const employmentTypeSchema = z.enum([
 const workplaceTypeSchema = z.enum(["on_site", "remote", "hybrid"]);
 
 const jobFormSchema = z.object({
-  title:             z.string().min(1, "Title is required").max(200),
-  description:       z.string().min(1, "Description is required"),
-  location:          z.string().min(1, "Location is required").max(200),
-  employmentType:    employmentTypeSchema,
-  workplaceType:     workplaceTypeSchema,
-  salaryMin:         z.number().int().positive().nullable().optional(),
-  salaryMax:         z.number().int().positive().nullable().optional(),
-  salaryCurrency:    z.string().default("USD"),
-  tags:              z.array(z.string()).optional(),
-  autoCloseOnAccept: z.boolean().optional().default(false),
-  agentId:           z.string().optional(),
-  autoOrchestrate:   z.boolean().optional().default(false),
+  title:               z.string().min(1, "Title is required").max(200),
+  description:         z.string().min(1, "Description is required"),
+  location:            z.string().min(1, "Location is required").max(200),
+  employmentType:      employmentTypeSchema,
+  workplaceType:       workplaceTypeSchema,
+  salaryMin:           z.number().int().positive().nullable().optional(),
+  salaryMax:           z.number().int().positive().nullable().optional(),
+  salaryCurrency:      z.string().default("USD"),
+  tags:                z.array(z.string()).optional(),
+  autoCloseOnAccept:   z.boolean().optional().default(false),
+  agentId:             z.string().optional(),
+  autoOrchestrate:     z.boolean().optional().default(false),
+  applicationDeadline: z.date().nullable().optional(),
+  topCandidateLimit:   z.number().int().min(1).default(10),
 });
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -153,10 +156,21 @@ export const jobsRouter = createTRPCRouter({
           autoCloseOnAccept: input.autoCloseOnAccept ?? false,
           applicationCount:  0,
           postedByUserId:    ctx.auth.user.id,
-          agentId:           input.agentId        ?? null,
-          autoOrchestrate:   input.autoOrchestrate ?? false,
+          agentId:             input.agentId        ?? null,
+          autoOrchestrate:     input.autoOrchestrate ?? false,
+          applicationDeadline: input.applicationDeadline ?? null,
+          topCandidateLimit:   input.topCandidateLimit ?? 10,
         })
         .returning({ id: jobListings.id });
+
+      // Schedule deadline trigger if deadline is set
+      if (input.applicationDeadline) {
+        await inngest.send({
+          name: "job/deadline.reached",
+          data: { jobId: inserted.id },
+          runAt: input.applicationDeadline,
+        });
+      }
 
       return {
         id:              inserted.id,
@@ -222,11 +236,22 @@ export const jobsRouter = createTRPCRouter({
         const effectiveAgent = input.agentId ?? existing.agentId;
         patch.autoOrchestrate = input.autoOrchestrate && !!effectiveAgent;
       }
+      if (input.applicationDeadline !== undefined) patch.applicationDeadline = input.applicationDeadline;
+      if (input.topCandidateLimit   !== undefined) patch.topCandidateLimit   = input.topCandidateLimit;
 
       await db
         .update(jobListings)
         .set(patch)
         .where(eq(jobListings.id, input.jobId));
+
+      // Re-schedule deadline trigger if deadline changed
+      if (input.applicationDeadline && input.applicationDeadline.getTime() !== existing.applicationDeadline?.getTime()) {
+        await inngest.send({
+          name: "job/deadline.reached",
+          data: { jobId: input.jobId },
+          runAt: input.applicationDeadline,
+        });
+      }
 
       return { success: true };
     }),
@@ -342,11 +367,12 @@ export const jobsRouter = createTRPCRouter({
     }),
 
   // ─── AI Auto-fill ─────────────────────────────────────────────────────────
-  // Takes a job title, returns a fully generated draft: description, location,
-  // employment type, workplace type, salary range, tags. One click to fill the form.
-
   autoFill: protectedProcedure
-    .input(z.object({ title: z.string().min(1).max(200) }))
+    .input(z.object({ 
+      title: z.string().optional(),
+      description: z.string().optional(),
+      location: z.string().optional(),
+    }))
     .mutation(async ({ input }) => {
       if (!process.env.OPENAI_API_KEY) {
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "OPENAI_API_KEY not set." });
@@ -356,33 +382,37 @@ export const jobsRouter = createTRPCRouter({
       const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
       const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: "gpt-4o",
         messages: [
           {
             role: "system",
             content:
-              "You are an expert technical recruiter. Generate realistic, professional job listing content. Return only valid JSON with no markdown.",
+              "You are an expert technical recruiter. Based on the provided partial job information, generate a professional, high-quality, and complete job listing. If the description is already provided, improve it to be more professional and thorough. Return only valid JSON.",
           },
           {
             role: "user",
-            content: `Generate a complete job listing for: "${input.title}"
+            content: `Complete/Improve this job listing:
+Title: ${input.title || "Unknown"}
+Current Description: ${input.description || "None"}
+Current Location: ${input.location || "None"}
 
 Return ONLY a valid JSON object with these exact fields:
 {
-  "description": "3-4 paragraph job description: what the company does, what the role involves, key responsibilities, what you're looking for. Plain text, no HTML.",
-  "location": "realistic city and country for this type of role",
+  "title": "Improved/Confirmed title",
+  "description": "Thorough, professional job description (3-4 paragraphs). Use best practices. No HTML.",
+  "location": "Specific city and country",
   "employmentType": "one of: full_time | part_time | contract | internship | temporary",
   "workplaceType": "one of: on_site | remote | hybrid",
   "salaryMin": integer annual USD or null,
-  "salaryMax": integer annual USD (20-40% above min) or null,
+  "salaryMax": integer annual USD or null,
   "salaryCurrency": "USD",
-  "tags": ["5-8 lowercase skill tags relevant to the role"]
+  "tags": ["5-8 lowercase skill tags"]
 }`,
           },
         ],
         response_format: { type: "json_object" },
-        temperature: 0.75,
-        max_tokens:  1500,
+        temperature: 0.7,
+        max_tokens:  2000,
       });
 
       const raw = completion.choices[0].message.content ?? "{}";
@@ -393,8 +423,9 @@ Return ONLY a valid JSON object with these exact fields:
         const validWpTypes  = ["on_site", "remote", "hybrid"];
 
         return {
-          description:    typeof data.description    === "string" ? data.description    : "",
-          location:       typeof data.location       === "string" ? data.location       : "",
+          title:          typeof data.title          === "string" ? data.title          : input.title || "",
+          description:    typeof data.description    === "string" ? data.description    : input.description || "",
+          location:       typeof data.location       === "string" ? data.location       : input.location || "",
           employmentType: validEmpTypes.includes(data.employmentType) ? data.employmentType as any : "full_time",
           workplaceType:  validWpTypes.includes(data.workplaceType)   ? data.workplaceType  as any : "hybrid",
           salaryMin:      typeof data.salaryMin === "number" ? data.salaryMin : null,

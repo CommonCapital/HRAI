@@ -131,3 +131,73 @@ export const orchestrateApplication = inngest.createFunction(
     return result;
   },
 );
+
+export const jobDeadlineReached = inngest.createFunction(
+  {
+    id:   "job-deadline-reached",
+    name: "Job Deadline Reached - Send Invitations",
+  },
+  { event: "job/deadline.reached" },
+  async ({ event, step }) => {
+    const { jobId } = event.data;
+
+    // 1. Fetch job details
+    const job = await step.run("fetch-job", async () => {
+      const { jobListings: jobListingsTable } = await import("@/db/schema");
+      const [j] = await db
+        .select()
+        .from(jobListingsTable)
+        .where(eq(jobListingsTable.id, jobId));
+      return j;
+    });
+
+    if (!job) return { success: false, reason: "Job not found" };
+
+    // 2. Fetch all candidates for this job and their scores
+    const topCandidates = await step.run("fetch-top-candidates", async () => {
+      const { applications: appsTable, cvAnalysis: cvTable } = await import("@/db/schema");
+      const { desc, getTableColumns } = await import("drizzle-orm");
+      
+      return db
+        .select({
+          ...getTableColumns(appsTable),
+          score: cvTable.overallScore,
+        })
+        .from(appsTable)
+        .leftJoin(cvTable, eq(appsTable.cvAnalysisId, cvTable.id))
+        .where(eq(appsTable.jobId, jobId))
+        .orderBy(desc(cvTable.overallScore))
+        .limit(job.topCandidateLimit ?? 10);
+    });
+
+    // 3. For each top candidate, trigger orchestration (which creates meeting + sends email)
+    // Actually, orchestration pipeline might have already run for some.
+    // If it hasn't run, we run it. If it has, we check if they got an invite.
+    const results = [];
+    for (const cand of topCandidates) {
+      const result = await step.run(`process-candidate-${cand.id}`, async () => {
+        // If they already have a meetingId, we don't need to do anything
+        if (cand.meetingId) {
+          return { id: cand.id, skipped: true, reason: "Already invited" };
+        }
+
+        // Run the orchestration pipeline for this candidate
+        return runOrchestrationPipeline({
+          applicationId:  cand.id,
+          jobId:          cand.jobId,
+          candidateName:  cand.fullName,
+          candidateEmail: cand.email,
+          cvUrl:          cand.cvUrl,
+          recruiterId:    job.postedByUserId!,
+        });
+      });
+      results.push(result);
+    }
+
+    return {
+      success: true,
+      processed: topCandidates.length,
+      results,
+    };
+  }
+);

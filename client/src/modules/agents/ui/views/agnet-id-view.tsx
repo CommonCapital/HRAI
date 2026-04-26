@@ -128,7 +128,7 @@ export const AgentIdView = ({ agentId }: Props) => {
               </div>
             </div>
 
-            {/* Training Data + Report Template */}
+            {/* Training Data */}
             <div className="p-6 space-y-6">
               <div>
                 <div className="flex items-center gap-2 mb-3">
@@ -137,16 +137,6 @@ export const AgentIdView = ({ agentId }: Props) => {
                 </div>
                 <div className="border-l-4 border-primary pl-4 py-2">
                   <p className="text-sm font-light leading-relaxed opacity-80">{data.instructions}</p>
-                </div>
-              </div>
-
-              <div className="border-t border-primary/10 pt-6">
-                <div className="flex items-center gap-2 mb-3">
-                  <FileText size={20} className="text-primary" strokeWidth={1.5} />
-                  <h3 className="text-lg font-semibold text-primary tracking-tight">Report Template</h3>
-                </div>
-                <div className="border-l-4 border-primary pl-4 py-2">
-                  <p className="text-sm font-light leading-relaxed opacity-80">{data.instructions2}</p>
                 </div>
               </div>
             </div>

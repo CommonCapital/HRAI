@@ -190,7 +190,22 @@ export async function runOrchestrationPipeline(params: {
 
     // ── 6. Determine Scheduling Link (Replacement for direct meeting) ────────
     let meetingLink: string | null = null;
-    let savedMeetingId: string | null = null; // Will remain null as we don't create meeting yet
+    let savedMeetingId: string | null = null; 
+
+    // 🆕 NEW: If a deadline is set, we SKIP immediate invitation.
+    // The Invitations will be sent in batch by the Inngest cron at the deadline.
+    if (job.applicationDeadline) {
+      console.log(`[orchestration] Job has deadline (${job.applicationDeadline}). Skipping immediate invite to allow batch processing at deadline.`);
+      await db.update(applications).set({ autoHandled: true }).where(eq(applications.id, params.applicationId));
+      return { 
+        ranPipeline: true, 
+        cvAnalysisId: savedAnalysisId, 
+        meetingId: null, 
+        meetingLink: null, 
+        emailSent: false,
+        skipReason: "deferred_to_deadline"
+      };
+    }
 
     try {
       // Find the recruiter's default meeting type to send a scheduling link

@@ -6,14 +6,17 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useTRPC } from "@/trpc/client";
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
-import { ArrowLeft, Check, Zap, ZapOff } from "lucide-react";
+import { 
+  ArrowLeft, Check, ChevronDown, Zap, Search, Sparkles, Brain, 
+  ChevronUp, Mail, User, MapPin, Briefcase, Clock
+} from "lucide-react";
 import { CommandSelect } from "@/components/command-select";
 import { GeneratedAvatar } from "@/components/generated-avatar";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type JobFormValues = {
-  title:             string;
+  title:               string;
   description:       string;
   location:          string;
   employmentType:    "full_time" | "part_time" | "contract" | "internship" | "temporary";
@@ -25,6 +28,8 @@ type JobFormValues = {
   autoCloseOnAccept: boolean;
   agentId:           string;
   autoOrchestrate:   boolean;
+  applicationDeadline: string; // ISO date string or empty
+  topCandidateLimit:   string; // number as string
 };
 
 const EMP_LABELS: Record<string, string> = {
@@ -70,6 +75,8 @@ export function EditJobView({ jobId }: { jobId: string }) {
       autoCloseOnAccept: false,
       agentId:           "",
       autoOrchestrate:   false,
+      applicationDeadline: "",
+      topCandidateLimit:   "10",
     },
   });
 
@@ -89,6 +96,8 @@ export function EditJobView({ jobId }: { jobId: string }) {
       autoCloseOnAccept: job.autoCloseOnAccept ?? false,
       agentId:           (job as any).agentId           ?? "",
       autoOrchestrate:   (job as any).autoOrchestrate   ?? false,
+      applicationDeadline: (job as any).applicationDeadline ? new Date((job as any).applicationDeadline).toISOString().split('T')[0] : "",
+      topCandidateLimit:   String((job as any).topCandidateLimit ?? 10),
     });
   }, [job]);
 
@@ -98,6 +107,28 @@ export function EditJobView({ jobId }: { jobId: string }) {
   const selEmp          = form.watch("employmentType");
   const selWp           = form.watch("workplaceType");
   const currency        = form.watch("salaryCurrency") || "USD";
+
+  // ── AI Matching State ───────────────────────────────────────────────────
+  const [matchLoading, setMatchLoading] = useState(false);
+  const [matchData, setMatchData] = useState<any[] | null>(null);
+  const [matchExpanded, setMatchExpanded] = useState(false);
+
+  const matchCandidates = useMutation(
+    trpc.jobs.matchCandidates.mutationOptions()
+  );
+
+  const handleMatch = async () => {
+    setMatchLoading(true);
+    setMatchExpanded(true);
+    try {
+      const res = await matchCandidates.mutateAsync({ jobId });
+      setMatchData(res.matches);
+    } catch (e: any) {
+      setFeedback("Match failed: " + e.message);
+    } finally {
+      setMatchLoading(false);
+    }
+  };
 
   const handleAgentSelect = (val: string) => {
     form.setValue("agentId", val);
@@ -119,6 +150,10 @@ export function EditJobView({ jobId }: { jobId: string }) {
     }),
   );
 
+  const autoFillJob = useMutation(
+    trpc.jobs.autoFill.mutationOptions(),
+  );
+
   async function onSubmit(values: JobFormValues) {
     setFeedback(null);
     updateJob.mutate({
@@ -135,6 +170,8 @@ export function EditJobView({ jobId }: { jobId: string }) {
       autoCloseOnAccept: values.autoCloseOnAccept,
       agentId:           values.agentId || undefined,
       autoOrchestrate:   values.agentId ? values.autoOrchestrate : false,
+      applicationDeadline: values.applicationDeadline ? new Date(values.applicationDeadline) : undefined,
+      topCandidateLimit:   values.topCandidateLimit ? Number(values.topCandidateLimit) : 10,
     });
   }
 
@@ -188,6 +225,14 @@ export function EditJobView({ jobId }: { jobId: string }) {
                 </span>
               )}
               {feedback && <p className="ej-feedback">{feedback}</p>}
+              <button 
+                type="button" 
+                className="ej-match-trigger-btn"
+                onClick={handleMatch}
+              >
+                <Brain size={14} className="mr-2" />
+                Pull from DB
+              </button>
             </div>
           </div>
         </div>
@@ -196,7 +241,48 @@ export function EditJobView({ jobId }: { jobId: string }) {
         <form onSubmit={form.handleSubmit(onSubmit)} noValidate className="ej-form">
 
           <EjSection num="01" title="The Role">
-            <EjField label="Job title" required error={form.formState.errors.title?.message}>
+            <EjField 
+              label="Job title" 
+              required 
+              error={form.formState.errors.title?.message}
+              rightSlot={
+                <button
+                  type="button"
+                  className="ej-ai-fill-btn"
+                  onClick={async () => {
+                    const title = form.getValues("title");
+                    if (!title) {
+                      setFeedback("Enter a job title first for AI auto-fill.");
+                      return;
+                    }
+                    const promise = autoFillJob.mutateAsync({ 
+                      title,
+                      description: form.getValues("description"),
+                      location: form.getValues("location")
+                    });
+                    setFeedback("AI is analyzing and drafting...");
+                    try {
+                      const data = await promise;
+                      form.setValue("description", data.description);
+                      form.setValue("location", data.location);
+                      form.setValue("employmentType", data.employmentType);
+                      form.setValue("workplaceType", data.workplaceType);
+                      if (data.salaryMin) form.setValue("salaryMin", String(data.salaryMin));
+                      if (data.salaryMax) form.setValue("salaryMax", String(data.salaryMax));
+                      if (data.tags.length > 0) form.setValue("tags", data.tags.join(", "));
+                      if (data.title) form.setValue("title", data.title);
+                      setFeedback(null);
+                      setSaved(true);
+                      setTimeout(() => setSaved(false), 3000);
+                    } catch (e: any) {
+                      setFeedback("Auto-fill failed: " + e.message);
+                    }
+                  }}
+                >
+                  ✨ Smart AI-autofill
+                </button>
+              }
+            >
               <input className="ej-input" placeholder="e.g. Senior Product Designer"
                 {...form.register("title", { required: "Required." })} />
             </EjField>
@@ -356,6 +442,16 @@ export function EditJobView({ jobId }: { jobId: string }) {
                   In-flight pipelines for already-submitted CVs will still complete.
                 </div>
               )}
+
+              {/* 🆕 Deadline and Limit */}
+              <div className="ej-grid-2">
+                <EjField label="Application Deadline" hint="Auto-trigger invites after this date">
+                  <input type="date" className="ej-input" {...form.register("applicationDeadline")} />
+                </EjField>
+                <EjField label="Top-N Candidates" hint="Limit for auto-invitations">
+                  <input type="number" className="ej-input" placeholder="10" {...form.register("topCandidateLimit")} />
+                </EjField>
+              </div>
             </div>
           </EjSection>
 
@@ -375,6 +471,72 @@ export function EditJobView({ jobId }: { jobId: string }) {
             </button>
           </div>
         </form>
+
+        {/* ── AI Match Results Panel ──────────────────────────────────── */}
+        {matchExpanded && (
+          <div className="ej-match-panel">
+            <div className="ej-match-head">
+              <div className="flex items-center gap-2">
+                <Brain size={16} className="text-orange-500" />
+                <h3 className="ej-match-title">Database Matches</h3>
+                {matchData && <span className="ej-match-count">{matchData.length} found</span>}
+              </div>
+              <button className="ej-match-close" onClick={() => setMatchExpanded(false)}>
+                <ChevronDown size={18} />
+              </button>
+            </div>
+
+            <div className="ej-match-body">
+              {matchLoading ? (
+                <div className="ej-match-loading">
+                  <div className="ej-match-spinner" />
+                  Searching global database for candidates...
+                </div>
+              ) : matchData && matchData.length === 0 ? (
+                <div className="ej-match-empty">No matching candidates found in database.</div>
+              ) : (
+                <div className="ej-match-list">
+                  {matchData?.map((m, idx) => (
+                    <div key={m.applicationId} className="ej-match-card">
+                      <div className="ej-match-card-top">
+                        <div className="flex items-center gap-3">
+                          <span className="ej-match-rank">#{idx + 1}</span>
+                          <span className="ej-match-name">{m.candidateName}</span>
+                          <span className={`ej-match-rec ej-match-rec--${m.recommendation.toLowerCase().replace(" ", "-")}`}>
+                            {m.recommendation}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="ej-match-score">{m.score}%</span>
+                          <button 
+                            className="ej-match-view-btn"
+                            onClick={() => router.push(`/attendees?jobId=${jobId}&applicationId=${m.applicationId}`)}
+                          >
+                            View
+                          </button>
+                        </div>
+                      </div>
+                      
+                      <p className="ej-match-exp-text">{m.explanation}</p>
+                      
+                      <div className="ej-match-meta">
+                        {m.currentRole && <span className="ej-match-meta-item"><Briefcase size={12} />{m.currentRole}</span>}
+                        {m.location && <span className="ej-match-meta-item"><MapPin size={12} />{m.location}</span>}
+                        {m.experienceYears && <span className="ej-match-meta-item"><Clock size={12} />{m.experienceYears} yrs</span>}
+                      </div>
+
+                      <div className="ej-match-tags">
+                        {m.strengths?.slice(0, 3).map((s: string) => (
+                          <span key={s} className="ej-match-tag ej-match-tag--plus">✓ {s}</span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </>
   );
@@ -394,14 +556,17 @@ function EjSection({ num, title, children }: { num: string; title: string; child
   );
 }
 
-function EjField({ label, error, hint, required, children }: {
-  label: string; error?: string; hint?: string; required?: boolean; children: React.ReactNode;
+function EjField({ label, error, hint, required, rightSlot, children }: {
+  label: string; error?: string; hint?: string; required?: boolean; rightSlot?: React.ReactNode; children: React.ReactNode;
 }) {
   return (
     <div className="ej-field">
-      <label className="ej-label">
-        {label}{required && <span className="ej-req"> *</span>}
-      </label>
+      <div className="flex items-center justify-between">
+        <label className="ej-label">
+          {label}{required && <span className="ej-req"> *</span>}
+        </label>
+        {rightSlot}
+      </div>
       {children}
       {hint  && !error && <p className="ej-hint">{hint}</p>}
       {error && <p className="ej-err">{error}</p>}
@@ -428,7 +593,11 @@ const css = `
     padding: 40px 24px 100px;
     font-family: var(--fb);
     color: var(--o);
+    background: linear-gradient(to bottom, #fff, var(--o05));
   }
+  .ej-ai-fill-btn { background:none; border:none; font-family:var(--fm); font-size:10px; color:var(--o); cursor:pointer; padding:0; letter-spacing:0.04em; text-transform:uppercase; transition:opacity 0.1s; }
+  .ej-ai-fill-btn:hover { opacity:0.7; }
+  .ej-grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
   /* Header */
   .ej-back-btn { background:none; border:none; font-family:var(--fb); font-size:12px; color:var(--o40); cursor:pointer; padding:0; margin-bottom:28px; display:inline-flex; align-items:center; transition:color 0.12s; }
   .ej-back-btn:hover { color:var(--o); }
@@ -504,5 +673,49 @@ const css = `
     .ej-root { padding:24px 16px 80px; }
     .ej-grid-3 { grid-template-columns:1fr 1fr; }
     .ej-header-body { flex-direction:column; gap:12px; }
+  }
+    font-size:12px; font-weight:700; color:var(--o); background:#fff;
+    border:1px solid var(--o20); border-radius:12px; height:42px; padding:0 18px;
+    cursor:pointer; transition:all 0.2s; display:flex; align-items:center;
+    box-shadow:0 2px 8px var(--o10); margin-top:8px;
+  }
+  .ej-match-trigger-btn:hover { background:var(--o); color:#fff; box-shadow:0 4px 12px var(--o20); transform:translateY(-1px); }
+
+  /* Match Panel */
+  .ej-match-panel { margin-top:40px; background:#fff; border-radius:20px; border:1px solid var(--g200); overflow:hidden; box-shadow:0 12px 48px rgba(0,0,0,0.08); }
+  .ej-match-head { padding:20px 24px; background:linear-gradient(to right, var(--g50), #fff); border-bottom:1px solid var(--g100); display:flex; align-items:center; justify-content:space-between; }
+  .ej-match-title { font-family:var(--fd); font-size:18px; color:var(--g900); margin:0; }
+  .ej-match-count { font-size:11px; background:var(--o10); color:var(--o); padding:2px 8px; border-radius:99px; font-weight:600; }
+  .ej-match-close { background:none; border:none; color:var(--g700); cursor:pointer; opacity:0.5; transition:opacity 0.2s; }
+  .ej-match-close:hover { opacity:1; }
+  .ej-match-body { padding:24px; max-height:600px; overflow-y:auto; }
+  .ej-match-loading { padding:60px 0; text-align:center; color:var(--g700); font-size:14px; display:flex; flex-direction:column; align-items:center; gap:16px; }
+  .ej-match-spinner { width:30px; height:30px; border:3px solid var(--o10); border-top-color:var(--o); border-radius:50%; animation:ej-spin 0.8s linear infinite; }
+  @keyframes ej-spin { to { transform:rotate(360deg); } }
+  .ej-match-empty { padding:60px 0; text-align:center; color:var(--g700); font-style:italic; }
+  .ej-match-card { padding:20px; border-radius:14px; border:1px solid var(--g100); margin-bottom:16px; transition:transform 0.2s, border-color 0.2s; }
+  .ej-match-card:hover { border-color:var(--o30); transform:translateX(4px); }
+  .ej-match-card-top { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+  .ej-match-rank { font-family:var(--fm); font-size:12px; color:var(--o30); }
+  .ej-match-name { font-weight:700; font-size:15px; color:var(--g900); }
+  .ej-match-score { font-family:var(--fm); font-size:14px; font-weight:700; color:var(--o); }
+  .ej-match-view-btn { font-size:11px; font-weight:700; color:var(--o); background:#fff; border:1px solid var(--o20); border-radius:6px; padding:4px 10px; cursor:pointer; transition:all 0.2s; }
+  .ej-match-view-btn:hover { background:var(--o); color:#fff; border-color:var(--o); }
+  .ej-match-rec { font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; padding:2px 8px; border-radius:4px; }
+  .ej-match-rec--strong-hire { background:#dcfce7; color:#166534; }
+  .ej-match-rec--hire        { background:#f0fdf4; color:#15803d; }
+  .ej-match-rec--interview   { background:#fefce8; color:#854d0e; }
+  .ej-match-rec--maybe       { background:#f9fafb; color:#4b5563; }
+  .ej-match-rec--pass        { background:#fef2f2; color:#991b1b; }
+  .ej-match-exp-text { font-size:13px; color:var(--g700); line-height:1.6; margin:0 0 14px; }
+  .ej-match-meta { display:flex; flex-wrap:wrap; gap:16px; margin-bottom:12px; }
+  .ej-match-meta-item { display:flex; align-items:center; gap:6px; font-size:11px; color:var(--g700); opacity:0.7; }
+  .ej-match-tags { display:flex; flex-wrap:wrap; gap:6px; }
+  .ej-match-tag { font-size:10px; font-weight:600; padding:2px 8px; border-radius:99px; }
+  .ej-match-tag--plus { background:var(--o10); color:var(--o); }
+
+  @media (max-width: 640px) {
+    .ej-header-body { flex-direction:column; align-items:flex-start; gap:20px; }
+    .ej-match-trigger-btn { width:100%; justify-content:center; }
   }
 `;
