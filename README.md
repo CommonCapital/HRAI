@@ -93,4 +93,4 @@ src/
 
 ## 📄 License
 
-Internal Use Only — HRAI Proprietary Software.
+MIT License
