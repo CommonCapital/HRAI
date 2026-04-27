@@ -1,9 +1,9 @@
-// src/lib/plunk.ts
+// src/lib/resend.ts
 import { Resend } from "resend";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-export interface PlunkResult {
+export interface ResendResult {
   success: boolean;
   messageId?: string;
   error?: string;
@@ -13,7 +13,7 @@ export async function sendEmail(payload: {
   to: string;
   subject: string;
   body: string;
-}): Promise<PlunkResult> {
+}): Promise<ResendResult> {
   try {
     const { data, error } = await resend.emails.send({
       from: "HRAi <onboarding@resend.dev>", // ← your verified domain
@@ -29,7 +29,7 @@ export async function sendEmail(payload: {
   }
 }
 
- // keep your template as-is// ── Email templates ───────────────────────────────────────────────────────────
+// ── Email templates ───────────────────────────────────────────────────────────
 
 export function buildInterviewInviteEmail(params: {
   candidateName: string;

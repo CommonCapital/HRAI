@@ -52,7 +52,7 @@ HRAI is a high-performance recruitment platform that transforms hiring from a ma
    ```
 
 2. **Configure Environment Variables**:
-   Create a `.env` file with your `DATABASE_URL`, `OPENAI_API_KEY`, `PLUNK_API_KEY`, and Google OAuth credentials.
+   Create a `.env` file with your `DATABASE_URL`, `OPENAI_API_KEY`, `RESEND_API_KEY`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, and Google OAuth credentials.
 
 3. **Synchronize Database**:
    ```bash

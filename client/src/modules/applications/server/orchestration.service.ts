@@ -11,7 +11,7 @@ import { storeFile, deleteFile } from "@/modules/candidates/services/file-storag
 import { sanitizeAnalysisData } from "@/modules/candidates/controllers/cv.controllers";
 import { streamVideo } from "@/lib/stream-video";
 import { GeneratdAvatarUri } from "@/lib/avatar";
-import { sendEmail, buildInterviewInviteEmail } from "@/lib/plunk";
+import { sendEmail, buildInterviewInviteEmail } from "@/lib/resend";
 
 const AUTO_INTERVIEW_THRESHOLD = new Set(["Strong Hire", "Hire", "Interview"]);
 
@@ -245,7 +245,7 @@ export async function runOrchestrationPipeline(params: {
       console.error("[orchestration] Scheduling link generation failed:", err.message);
     }
 
-    // ── 8. Send Plunk email ───────────────────────────────────────────────────
+    // ── 8. Send Resend email ───────────────────────────────────────────────────
     let emailSent = false;
     if (meetingLink && params.candidateEmail) {
       try {

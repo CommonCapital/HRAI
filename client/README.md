@@ -30,7 +30,7 @@ HRAI is a modern recruitment automation platform designed to streamline the hiri
 - **State Management**: TanStack Query (React Query)
 - **Styling**: Vanilla CSS with Design Tokens & Lucide Icons
 - **AI/ML**: OpenAI GPT-4o for document extraction and analysis
-- **Mailing**: Plunk (AWS SES based)
+- **Mailing**: Resend
 
 ## 📦 Project Structure
 
@@ -70,6 +70,7 @@ src/
 
    # Auth
    BETTER_AUTH_SECRET=...
+   BETTER_AUTH_URL=http://localhost:3000
    NEXT_PUBLIC_APP_URL=http://localhost:3000
 
    # Google API (for Calendars/Meet)
@@ -78,7 +79,7 @@ src/
 
    # AI & Email
    OPENAI_API_KEY=...
-   PLUNK_API_KEY=...
+   RESEND_API_KEY=...
    ```
 
 4. **Synchronize Database**:
