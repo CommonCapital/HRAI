@@ -76,7 +76,7 @@
     "googleapis": "^171.4.0",
     "groq-sdk": "^0.26.0",
     "humanize-duration": "^3.33.0",
-    "inngest": "3.54.0",
+    "inngest": "^3.54.0",
     "input-otp": "^1.4.2",
     "install": "^0.13.0",
     "jsonl-parse-stringify": "^1.0.3",
