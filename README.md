@@ -64,6 +64,13 @@ HRAI is a high-performance recruitment platform that transforms hiring from a ma
    npm run dev
    ```
 
+5. **Start Inngest Local Server**:
+   In a new terminal, run:
+   ```bash
+   cd client
+   npx inngest-cli dev
+   ```
+
 ## 📄 License
 
 MIT License
