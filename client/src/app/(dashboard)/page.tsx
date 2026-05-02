@@ -22,12 +22,12 @@ import { useRouter } from "next/navigation";
 // ─── Pipeline event stream ────────────────────────────────────────────────────
 const pipelineEvents = [
   { t: "00:00", type: "apply",     label: "Application received",      sub: "Jane D. · Senior Engineer",          score: null },
-  { t: "00:03", type: "cv",        label: "CV parsed & analysed",       sub: "94 data-points extracted",            score: null },
-  { t: "00:08", type: "score",     label: "AI score computed",           sub: "Role fit · Experience · Culture",     score: 88  },
-  { t: "00:12", type: "decision",  label: "Recommendation: Strong Hire", sub: "Auto-meet triggered",                 score: null },
-  { t: "00:15", type: "meeting",   label: "Interview scheduled",         sub: "Link sent to candidate",              score: null },
-  { t: "00:18", type: "interview", label: "AI interview completed",       sub: "Transcript + report generated",       score: null },
-  { t: "00:22", type: "rank",      label: "Candidate ranked #1 / 34",    sub: "Evidence-backed reasoning attached",  score: null },
+  { t: "00:03", type: "cv",        label: "AI parsed & analysed",      sub: "94 data-points extracted",            score: null },
+  { t: "00:08", type: "score",     label: "AI score computed",         sub: "Role fit · Experience · Culture",     score: 88  },
+  { t: "00:12", type: "decision",  label: "Smart deferral active",     sub: "Waiting for deadline...",             score: null },
+  { t: "00:15", type: "meeting",   label: "Past talent matched",       sub: "3 high-fit profiles found",           score: null },
+  { t: "00:18", type: "interview", label: "Deadline reached",          sub: "Top 5 candidates selected",           score: null },
+  { t: "00:22", type: "rank",      label: "Invites dispatched",        sub: "Interview links sent automatically",  score: null },
 ];
 
 const eventIcon: Record<string, any> = {
@@ -150,16 +150,16 @@ export default function HRAILanding() {
                 animate={{ letterSpacing: ["0.1em","0.16em","0.1em"] }}
                 transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut" }}
               >
-                Full-Stack AI Hiring Orchestration
+                The AI-First Recruitment Engine
               </motion.div>
 
               <h1 className="text-4xl md:text-6xl lg:text-7xl font-semibold leading-none mt-5 tracking-tight">
                 <motion.span initial={{ opacity: 0, x: -18 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }}>
-                  One config.
+                  Discover. Rank.
                 </motion.span>
                 <br />
                 <motion.span initial={{ opacity: 0, x: -18 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.38 }} className="italic font-light">
-                  Every hire.
+                  Invite.
                 </motion.span>
               </h1>
 
@@ -168,8 +168,8 @@ export default function HRAILanding() {
                 initial={{ opacity: 0 }} animate={{ opacity: 0.8 }} transition={{ delay: 0.55 }}
               >
                 Assign an AI agent to a job listing and walk away. HRAI parses CVs, scores 
-                candidates against your exact criteria, schedules interviews, conducts them, 
-                and delivers ranked, evidence-backed reports — <em>fully autonomously</em>.
+                candidates against your exact criteria, discovers hidden gems in your talent pool, 
+                and automatically dispatches interview invites to the absolute best candidates when the deadline hits.
               </motion.p>
             </motion.div>
 
@@ -303,18 +303,18 @@ export default function HRAILanding() {
           </motion.div>
 
           <div>
-            <PipelineStep number="01" title="Define your standards" tag="One-time setup" delay={0}
-              description="Create a job listing, assign an AI agent, and toggle automation on. Your criteria, red-flag rules, and culture signals are embedded — not generic patterns." />
-            <PipelineStep number="02" title="CV parsed & scored" tag="Automatic" delay={0.08}
-              description="Every inbound CV is parsed, validated against your job description, and scored across role fit, experience, and culture alignment. No keyword matching — genuine comprehension." />
-            <PipelineStep number="03" title="Decision engine fires" tag="Automatic" delay={0.16}
-              description="Recommendations in four tiers: Strong Hire, Hire, Interview, or Pass. Strong Hire and Hire automatically trigger the next stage. Every decision is fully traceable." />
-            <PipelineStep number="04" title="Interview auto-scheduled & conducted" tag="Automatic" delay={0.24}
-              description="The candidate receives a personalised email with a meeting link. The AI interviewer conducts a structured session aligned to your hiring standards — text or voice." />
-            <PipelineStep number="05" title="Transcript & report generated" tag="Automatic" delay={0.32}
-              description="A detailed post-interview report is created instantly: scores per dimension, verbatim evidence, strengths, concerns, and an overall recommendation." />
-            <PipelineStep number="06" title="Ranked shortlist delivered" tag="Recruiter reviews" delay={0.4}
-              description="Recruiters open a ranked view of all candidates with evidence-backed reasoning. Every data point is auditable. One decision, not one hundred." />
+            <PipelineStep number="01" title="Define & Discover" tag="One-time setup" delay={0}
+              description="Create a job listing, assign an AI agent, and instantly discover matching candidates from your past talent pool." />
+            <PipelineStep number="02" title="Automated Ingestion" tag="Automatic" delay={0.08}
+              description="Every inbound CV is parsed, validated against your job description, and assigned an AI Score based on role fit and experience." />
+            <PipelineStep number="03" title="Instant Sorting" tag="Automatic" delay={0.16}
+              description="Candidates are instantly ranked top-to-bottom. No manual screening or keyword matching required — genuine comprehension." />
+            <PipelineStep number="04" title="Smart Deferral" tag="Automatic" delay={0.24}
+              description="Invitations are intelligently held back until your job deadline hits, ensuring the entire candidate pool is evaluated fairly." />
+            <PipelineStep number="05" title="Top-N Batching" tag="Automatic" delay={0.32}
+              description="Once the deadline arrives, the system selects only the absolute best candidates according to your predefined limit." />
+            <PipelineStep number="06" title="Automated Scheduling" tag="Recruiter reviews" delay={0.4}
+              description="The top candidates automatically receive personalized booking links for interviews. You just show up to the calls." />
           </div>
         </div>
       </section>
@@ -346,11 +346,11 @@ export default function HRAILanding() {
 
             <div className="space-y-3 md:space-y-4">
               {[
-                { role: "Senior Engineer",   stage: "Interview",   candidate: "Jane D.",     score: 88, progress: 90 },
-                { role: "Product Designer",  stage: "CV Analysis", candidate: "Marcus T.",   score: null, progress: 35 },
-                { role: "Data Scientist",    stage: "Screening",   candidate: "Priya K.",    score: null, progress: 15 },
+                { role: "Senior Engineer",   stage: "Booked",      candidate: "Jane D.",     score: 88, progress: 90 },
+                { role: "Product Designer",  stage: "AI Scoring",  candidate: "Marcus T.",   score: null, progress: 35 },
+                { role: "Data Scientist",    stage: "Deferred",    candidate: "Priya K.",    score: null, progress: 15 },
                 { role: "Backend Developer", stage: "Ranked",      candidate: "Omar F.",     score: 74, progress: 100 },
-                { role: "DevOps Engineer",   stage: "Scheduled",   candidate: "Lena W.",     score: null, progress: 60 },
+                { role: "DevOps Engineer",   stage: "Matched",     candidate: "Lena W.",     score: null, progress: 60 },
               ].map((row, i) => (
                 <motion.div
                   key={i}
@@ -485,12 +485,12 @@ export default function HRAILanding() {
               </thead>
               <tbody className="px-4 md:px-6">
                 {[
-                  ["Full pipeline — apply → offer, zero human steps", 0.0],
+                  ["Full pipeline — apply to scheduled interview", 0.0],
                   ["Company-specific AI (your criteria, not generic)", 0.06],
-                  ["AI interviews with structured evaluation", 0.12],
-                  ["Evidence-backed candidate ranking", 0.18],
-                  ["Fully auditable, explainable decisions", 0.24],
-                  ["Parallel pipelines across all open roles", 0.30],
+                  ["Proactive talent discovery from past applicants", 0.12],
+                  ["Evidence-backed candidate ranking and scoring", 0.18],
+                  ["Strategic deadline batching for interviews", 0.24],
+                  ["Fully auditable, explainable decisions", 0.30],
                 ].map(([feat, delay]) => (
                   <DiffRow key={feat as string} feature={feat} delay={delay} />
                 ))}

@@ -45,6 +45,8 @@ type JobFormValues = {
   autoCloseOnAccept: boolean;
   agentId:           string;
   autoOrchestrate:   boolean;
+  applicationDeadline: string;
+  topCandidateLimit:   string;
 };
 
 const DEFAULT_FORM: JobFormValues = {
@@ -53,6 +55,7 @@ const DEFAULT_FORM: JobFormValues = {
   salaryMin: "", salaryMax: "", salaryCurrency: "USD",
   tags: "", autoCloseOnAccept: false,
   agentId: "", autoOrchestrate: false,
+  applicationDeadline: "", topCandidateLimit: "10",
 };
 
 const EMP_LABELS: Record<string, string> = {
@@ -265,6 +268,8 @@ export function JobsView() {
       autoCloseOnAccept: values.autoCloseOnAccept,
       agentId:           values.agentId || undefined,
       autoOrchestrate:   values.agentId ? values.autoOrchestrate : false,
+      applicationDeadline: values.applicationDeadline ? new Date(values.applicationDeadline) : undefined,
+      topCandidateLimit:   values.topCandidateLimit ? Number(values.topCandidateLimit) : 10,
     });
   }
 
@@ -880,6 +885,15 @@ export function JobsView() {
                         <span className="crm-switch-thumb" />
                       </div>
                     </button>
+                    
+                    <div className="crm-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                      <CrmField label="Application Deadline" hint="Auto-trigger invites after this date">
+                        <input type="date" className="crm-input" {...form.register("applicationDeadline")} />
+                      </CrmField>
+                      <CrmField label="Top-N Candidates" hint="Limit for auto-invitations">
+                        <input type="number" className="crm-input" placeholder="10" {...form.register("topCandidateLimit")} />
+                      </CrmField>
+                    </div>
                   </div>
                 </CrmSection>
 
